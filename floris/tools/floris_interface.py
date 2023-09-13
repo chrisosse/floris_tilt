@@ -110,7 +110,7 @@ class FlorisInterface(LoggerBase):
     def calculate_wake(
         self,
         yaw_angles: NDArrayFloat | list[float] | None = None,
-        # tilt_angles: NDArrayFloat | list[float] | None = None,
+        tilt_angles: NDArrayFloat | list[float] | None = None,
     ) -> None:
         """
         Wrapper to the :py:meth:`~.Farm.set_yaw_angles` and
@@ -131,14 +131,14 @@ class FlorisInterface(LoggerBase):
             )
         self.floris.farm.yaw_angles = yaw_angles
 
-        # # TODO is this required?
-        # if tilt_angles is not None:
-        #     self.floris.farm.tilt_angles = tilt_angles
-        # else:
-        #     self.floris.farm.set_tilt_to_ref_tilt(
-        #         self.floris.flow_field.n_wind_directions,
-        #         self.floris.flow_field.n_wind_speeds
-        #     )
+        # TODO is this required?
+        if tilt_angles is not None:
+            self.floris.farm.tilt_angles = tilt_angles
+        else:
+            self.floris.farm.set_tilt_to_ref_tilt(
+                self.floris.flow_field.n_wind_directions,
+                self.floris.flow_field.n_wind_speeds
+            )
 
         # Initialize solution space
         self.floris.initialize_domain()
@@ -340,6 +340,7 @@ class FlorisInterface(LoggerBase):
         wd=None,
         ws=None,
         yaw_angles=None,
+        tilt_angles=None,
     ):
         """
         Shortcut method to instantiate a :py:class:`~.tools.cut_plane.CutPlane`
@@ -370,7 +371,12 @@ class FlorisInterface(LoggerBase):
 
         # Store the current state for reinitialization
         floris_dict = self.floris.as_dict()
-        current_yaw_angles = self.floris.farm.yaw_angles
+        current_yaw_angles = yaw_angles
+        if yaw_angles is None:
+            current_yaw_angles = self.floris.farm.yaw_angles
+        current_tilt_angles = tilt_angles
+        if tilt_angles is None:
+            current_tilt_angles = self.floris.farm.tilt_angles
 
         # Set the solver to a flow field planar grid
         solver_settings = {
@@ -385,6 +391,8 @@ class FlorisInterface(LoggerBase):
         # TODO this has to be done here as it seems to be lost with reinitialize
         if yaw_angles is not None:
             self.floris.farm.yaw_angles = yaw_angles
+        if tilt_angles is not None:
+            self.floris.farm.tilt_angles = tilt_angles
 
         # Calculate wake
         self.floris.solve_for_viz()
@@ -409,7 +417,7 @@ class FlorisInterface(LoggerBase):
         self.floris = Floris.from_dict(floris_dict)
 
         # Run the simulation again for futher postprocessing (i.e. now we can get farm power)
-        self.calculate_wake(yaw_angles=current_yaw_angles)
+        self.calculate_wake(yaw_angles=current_yaw_angles, tilt_angles=current_tilt_angles)
 
         return horizontal_plane
 
@@ -423,6 +431,7 @@ class FlorisInterface(LoggerBase):
         wd=None,
         ws=None,
         yaw_angles=None,
+        tilt_angles=None,
     ):
         """
         Shortcut method to instantiate a :py:class:`~.tools.cut_plane.CutPlane`
@@ -453,7 +462,12 @@ class FlorisInterface(LoggerBase):
 
         # Store the current state for reinitialization
         floris_dict = self.floris.as_dict()
-        current_yaw_angles = self.floris.farm.yaw_angles
+        current_yaw_angles = yaw_angles
+        if yaw_angles is None:
+            current_yaw_angles = self.floris.farm.yaw_angles
+        current_tilt_angles = tilt_angles
+        if tilt_angles is None:
+            current_tilt_angles = self.floris.farm.tilt_angles
 
         # Set the solver to a flow field planar grid
         solver_settings = {
@@ -468,6 +482,8 @@ class FlorisInterface(LoggerBase):
         # TODO this has to be done here as it seems to be lost with reinitialize
         if yaw_angles is not None:
             self.floris.farm.yaw_angles = yaw_angles
+        if tilt_angles is not None:
+            self.floris.farm.yaw_angles = tilt_angles
 
         # Calculate wake
         self.floris.solve_for_viz()
@@ -487,7 +503,7 @@ class FlorisInterface(LoggerBase):
         self.floris = Floris.from_dict(floris_dict)
 
         # Run the simulation again for futher postprocessing (i.e. now we can get farm power)
-        self.calculate_wake(yaw_angles=current_yaw_angles)
+        self.calculate_wake(yaw_angles=current_yaw_angles, tilt_angles=current_tilt_angles)
 
         return cross_plane
 
@@ -501,6 +517,7 @@ class FlorisInterface(LoggerBase):
         wd=None,
         ws=None,
         yaw_angles=None,
+        tilt_angles=None,
     ):
         """
         Shortcut method to instantiate a :py:class:`~.tools.cut_plane.CutPlane`
@@ -531,7 +548,12 @@ class FlorisInterface(LoggerBase):
 
         # Store the current state for reinitialization
         floris_dict = self.floris.as_dict()
-        current_yaw_angles = self.floris.farm.yaw_angles
+        current_yaw_angles = yaw_angles
+        if yaw_angles is None:
+            current_yaw_angles = self.floris.farm.yaw_angles
+        current_tilt_angles = tilt_angles
+        if tilt_angles is None:
+            current_tilt_angles = self.floris.farm.tilt_angles
 
         # Set the solver to a flow field planar grid
         solver_settings = {
@@ -546,6 +568,8 @@ class FlorisInterface(LoggerBase):
         # TODO this has to be done here as it seems to be lost with reinitialize
         if yaw_angles is not None:
             self.floris.farm.yaw_angles = yaw_angles
+        if tilt_angles is not None:
+            self.floris.farm.tilt_angles = tilt_angles
 
         # Calculate wake
         self.floris.solve_for_viz()
@@ -565,7 +589,7 @@ class FlorisInterface(LoggerBase):
         self.floris = Floris.from_dict(floris_dict)
 
         # Run the simulation again for futher postprocessing (i.e. now we can get farm power)
-        self.calculate_wake(yaw_angles=current_yaw_angles)
+        self.calculate_wake(yaw_angles=current_yaw_angles, tilt_angles=current_tilt_angles)
 
         return y_plane
 
