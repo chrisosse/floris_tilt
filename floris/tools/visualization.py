@@ -421,6 +421,233 @@ def visualize_heterogeneous_cut_plane(
 
     return im
 
+###
+def visualize_cut_plane_colormesh(
+    cut_plane,
+    view='side',
+    x_resolution=200,
+    y_resolution=200,
+    ax=None,
+    vel_component='u',
+    min_speed=None,
+    max_speed=None,
+    figsize=None,
+    xlim=None,
+    ylim=None,
+    cmap='coolwarm',
+    color_bar=True,
+    set_aspect_equal=True,
+    title="",
+    **kwargs  
+):
+    """
+    Generate color mesh plot of the cut_plane.
+
+    Args:
+        cut_plane (:py:class:`~.tools.cut_plane.CutPlane`): 2D
+            plane through wind plant.
+        view (str): The view, to give axis right labels
+        x_resolution (int): The resolution in x direction of the plane.
+        y_resolution (int): The resolution in y direction of the plane.
+        ax (:py:class:`matplotlib.pyplot.axes`, optional): Figure axes. Defaults
+            to None.
+        vel_component (str, optional): The velocity component that the cut plane is
+            perpendicular to.
+        min_speed (float, optional): Minimum value of wind speed for
+            contours. Defaults to None.
+        max_speed (float, optional): Maximum value of wind speed for
+            contours. Defaults to None.
+        figsize (tuple, optional): Size of the figure, consiting of
+            (horizontal, vertical) size.
+        xlim (tuple, optional): Limits of figure in x direction.
+        ylim (tuple, optional): Limits of figure in y direction.
+        cmap (str, optional): Colormap specifier. Defaults to
+            'coolwarm'.
+        color_bar (Boolean, optional): Flag to include a color bar on the plot.
+            Defaults to False.
+        set_aspect_equal (Boolean, optional): Flag to make the aspect ratio
+            of both axes equal. Defaults to True
+        title (str, optional): User-supplied title for the plot. Defaults to "".
+        **kwargs: Additional parameters to pass to line contour plot.
+
+    Returns:
+        im (:py:class:`matplotlib.plt.pcolormesh`): Image handle.
+    """
+    
+    if vel_component=='u':
+        vel_mesh = cut_plane.df.u.values.reshape(cut_plane.resolution[1], cut_plane.resolution[0])
+        if min_speed is None:
+            min_speed = cut_plane.df.u.min()
+        if max_speed is None:
+            max_speed = cut_plane.df.u.max()
+    elif vel_component=='v':
+        vel_mesh = cut_plane.df.v.values.reshape(cut_plane.resolution[1], cut_plane.resolution[0])
+        if min_speed is None:
+            min_speed = cut_plane.df.v.min()
+        if max_speed is None:
+            max_speed = cut_plane.df.v.max()
+    elif vel_component=='w':
+        vel_mesh = cut_plane.df.w.values.reshape(cut_plane.resolution[1], cut_plane.resolution[0])
+        if min_speed is None:
+            min_speed = cut_plane.df.w.min()
+        if max_speed is None:
+            max_speed = cut_plane.df.w.max()
+    
+    X = np.linspace(cut_plane.df.x1.min(), cut_plane.df.x1.max(), x_resolution+1)
+    Y = np.linspace(cut_plane.df.x2.min(), cut_plane.df.x2.max(), y_resolution+1)
+
+    if not ax:
+        fig, ax = plt.subplots(figsize=figsize)
+        
+    im = ax.pcolormesh(
+        X, 
+        Y, 
+        vel_mesh, 
+        vmin=min_speed,
+        vmax=max_speed,
+        cmap=cmap,
+    )
+
+    if cut_plane.normal_vector == "x":
+            ax.invert_xaxis()
+
+    if color_bar:
+        cbar = plt.colorbar(im, ax=ax)
+        cbar.set_label(vel_component+' [m/s]')
+
+    # Set the title and axis labels
+    ax.set_title(title)
+    if view == 'side':
+        ax.set_xlabel('x [m]')
+        ax.set_ylabel('z [m]')
+    if view == 'top':
+        ax.set_xlabel('x [m]')
+        ax.set_ylabel('y [m]')
+    if view == 'front':
+        ax.set_xlabel('y [m]')
+        ax.set_ylabel('z [m]')
+
+    # Set limits    
+    ax.set_xlim(xlim)
+    ax.set_ylim(ylim)
+
+    # Make axis equal
+    if set_aspect_equal:
+        ax.set_aspect("equal")
+
+    return im
+
+
+def visualize_all_cut_planes_colormesh(
+    horizontal_plane,
+    y_plane,
+    cross_plane,
+    x_resolution=200,
+    y_resolution=200,
+    vel_component='u',
+    min_speed=None,
+    max_speed=None,
+    figsize=None,
+    xlim=None,
+    ylim=None,
+    cmap='coolwarm',
+    color_bar=True,
+    set_aspect_equal=True,
+    title="",
+    **kwargs 
+):
+    """
+    Generate color mesh plots of the horizontal- y- and cross-planes.
+
+    Args:
+        horizontal_plane (:py:class:`~.tools.cut_plane.CutPlane`): 2D
+            horizontal plane through wind plant.
+        y_plane (:py:class:`~.tools.cut_plane.CutPlane`): 2D
+            y plane through wind plant.
+        cross_plane (:py:class:`~.tools.cut_plane.CutPlane`): 2D
+            cross plane through wind plant.
+        x_resolution (int): The resolution in x direction of the plane.
+        y_resolution (int): The resolution in y direction of the plane.
+        vel_component (str, optional): The velocity component that the cut plane is
+            perpendicular to.
+        min_speed (float, optional): Minimum value of wind speed for
+            contours. Defaults to None.
+        max_speed (float, optional): Maximum value of wind speed for
+            contours. Defaults to None.
+        figsize (tuple, optional): Size of the figure, consiting of
+            (horizontal, vertical) size.
+        xlim (tuple, optional): Limits of figure in x direction.
+        ylim (tuple, optional): Limits of figure in y direction.
+        cmap (str, optional): Colormap specifier. Defaults to
+            'coolwarm'.
+        color_bar (Boolean, optional): Flag to include a color bar on the plot.
+            Defaults to False.
+        set_aspect_equal (Boolean, optional): Flag to make the aspect ratio
+            of both axes equal. Defaults to True
+        title (str, optional): User-supplied title for the plot. Defaults to "".
+        **kwargs: Additional parameters to pass to line contour plot.
+
+    Returns:
+        im (:py:class:`matplotlib.plt.pcolormesh`): Image handle.
+    """
+
+    # Visualize top plane
+    visualize_cut_plane_colormesh(
+        horizontal_plane,
+        view='top',
+        vel_component=vel_component,
+        x_resolution=x_resolution,
+        y_resolution=y_resolution,
+        min_speed=min_speed,
+        max_speed=max_speed,
+        figsize=figsize,
+        xlim=xlim,
+        ylim=ylim,
+        cmap=cmap,
+        color_bar=color_bar,
+        set_aspect_equal=set_aspect_equal,
+        title=title,
+        **kwargs 
+    )
+
+    # Visualize side plane
+    visualize_cut_plane_colormesh(
+        y_plane,
+        view='side',
+        vel_component=vel_component,
+        x_resolution=x_resolution,
+        y_resolution=y_resolution,
+        min_speed=min_speed,
+        max_speed=max_speed,
+        figsize=figsize,
+        xlim=xlim,
+        ylim=ylim,
+        cmap=cmap,
+        color_bar=color_bar,
+        set_aspect_equal=set_aspect_equal,
+        title=title,
+        **kwargs 
+    )
+
+    # Visualize front plane
+    visualize_cut_plane_colormesh(
+        cross_plane,
+        view='front',
+        vel_component=vel_component,
+        x_resolution=x_resolution,
+        y_resolution=y_resolution,
+        min_speed=min_speed,
+        max_speed=max_speed,
+        figsize=figsize,
+        xlim=xlim,
+        ylim=ylim,
+        cmap=cmap,
+        color_bar=color_bar,
+        set_aspect_equal=set_aspect_equal,
+        title=title,
+        **kwargs 
+    )
+###
 
 def visualize_quiver(cut_plane, ax=None, min_speed=None, max_speed=None, downSamp=1, **kwargs):
     """
