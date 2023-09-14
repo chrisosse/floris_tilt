@@ -483,7 +483,7 @@ class FlorisInterface(LoggerBase):
         if yaw_angles is not None:
             self.floris.farm.yaw_angles = yaw_angles
         if tilt_angles is not None:
-            self.floris.farm.yaw_angles = tilt_angles
+            self.floris.farm.tilt_angles = tilt_angles
 
         # Calculate wake
         self.floris.solve_for_viz()

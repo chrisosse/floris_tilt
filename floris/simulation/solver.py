@@ -1354,7 +1354,8 @@ def full_flow_empirical_gauss_solver(
     turbine_grid_farm.construct_turbine_fTilts()
     turbine_grid_farm.construct_turbine_correct_cp_ct_for_tilt()
     turbine_grid_farm.construct_coordinates()
-    turbine_grid_farm.set_tilt_to_ref_tilt(flow_field.n_wind_directions, flow_field.n_wind_speeds)
+    # NOTE Why is tilt set to reference tilt here?
+    # turbine_grid_farm.set_tilt_to_ref_tilt(flow_field.n_wind_directions, flow_field.n_wind_speeds)
 
     turbine_grid = TurbineGrid(
         turbine_coordinates=turbine_grid_farm.coordinates,
