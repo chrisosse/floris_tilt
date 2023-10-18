@@ -23,12 +23,14 @@ from floris import logging_manager
 from floris.simulation import (
     BaseClass,
     cc_solver,
+    ccm_solver,
     empirical_gauss_solver,
     Farm,
     FlowField,
     FlowFieldGrid,
     FlowFieldPlanarGrid,
     full_flow_cc_solver,
+    full_flow_ccm_solver,
     full_flow_empirical_gauss_solver,
     full_flow_sequential_solver,
     full_flow_turbopark_solver,
@@ -214,7 +216,7 @@ class Floris(BaseClass):
         # <<interface>>
         # start = time.time()
 
-        if vel_model in ["gauss", "cc", "turbopark", "jensen"] and \
+        if vel_model in ["gauss", "cc", "ccm", "turbopark", "jensen"] and \
             self.farm.correct_cp_ct_for_tilt.any():
             self.logger.warn(
                 "The current model does not account for vertical wake deflection due to " +
@@ -224,6 +226,13 @@ class Floris(BaseClass):
 
         if vel_model=="cc":
             cc_solver(
+                self.farm,
+                self.flow_field,
+                self.grid,
+                self.wake
+            )
+        elif vel_model=="ccm":
+            ccm_solver(
                 self.farm,
                 self.flow_field,
                 self.grid,
@@ -269,6 +278,8 @@ class Floris(BaseClass):
 
         if vel_model=="cc":
             full_flow_cc_solver(self.farm, self.flow_field, self.grid, self.wake)
+        elif vel_model=="ccm":
+            full_flow_ccm_solver(self.farm, self.flow_field, self.grid, self.wake)
         elif vel_model=="turbopark":
             full_flow_turbopark_solver(self.farm, self.flow_field, self.grid, self.wake)
         elif vel_model=="empirical_gauss":
