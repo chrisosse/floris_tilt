@@ -217,11 +217,12 @@ class CumulativeCurlMisalignmentVelocityDeficit(BaseModel):
         Ctmp[ii] = C
 
         yR = y_loc - y_i_loc
-        xR = yR * tand(misalignment_angle_i) + x_i
+        xR = x_i # + yR * tand(misalignment_angle_i)
 
         # add turbines together
         velDef = C * np.exp((-1 * r_tilde ** n) / (2 * sigma_n ** 2))
 
+        
         velDef = velDef * np.array(x - xR >= 0.1)
 
         turb_u_wake = turb_u_wake + turb_avg_vels * velDef
