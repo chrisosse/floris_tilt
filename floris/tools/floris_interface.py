@@ -119,6 +119,8 @@ class FlorisInterface(LoggerBase):
         Args:
             yaw_angles (NDArrayFloat | list[float] | None, optional): Turbine yaw angles.
                 Defaults to None.
+            tilt_angles (NDArrayFloat | list[float] | None, optional): Turbine tilt angles.
+                Defaults to None.
         """
 
         if yaw_angles is None:

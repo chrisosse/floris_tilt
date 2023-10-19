@@ -75,7 +75,8 @@ class CumulativeCurlMisalignmentVelocityDeficit(BaseModel):
         z_i: np.ndarray,
         u_i: np.ndarray,
         deflection_field: np.ndarray,
-        yaw_i: np.ndarray,
+        misalignment_angle_i: np.ndarray,
+        deflection_angle_i: np.ndarray,
         turbulence_intensity: np.ndarray,
         ct: np.ndarray,
         turbine_diameter: np.ndarray,
@@ -92,7 +93,6 @@ class CumulativeCurlMisalignmentVelocityDeficit(BaseModel):
 
         turbine_Ct = ct
         turbine_ti = turbulence_intensity
-        turbine_yaw = yaw_i
 
         # TODO Should this be cbrt? This is done to match v2
         turb_avg_vels = np.cbrt(np.mean(u_i ** 3, axis=(3,4)))
@@ -130,6 +130,9 @@ class CumulativeCurlMisalignmentVelocityDeficit(BaseModel):
 
         sum_lbda = np.zeros_like(u_initial)
 
+        deflection_y = sind(deflection_angle_i) * deflection_field
+        deflection_z = cosd(deflection_angle_i) * deflection_field
+
         for m in range(0, ii - 1):
             x_coord_m = x_coord[:,:,m:m+1]
             y_coord_m = y_coord[:,:,m:m+1]
@@ -155,8 +158,8 @@ class CumulativeCurlMisalignmentVelocityDeficit(BaseModel):
 
             S_i = sigma_n ** 2 + sigma_i ** 2
 
-            Y_i = (y_i_loc - y_coord_m - deflection_field) ** 2 / (2 * S_i)
-            Z_i = (z_i_loc - z_coord_m) ** 2 / (2 * S_i)
+            Y_i = (y_i_loc - y_coord_m - deflection_y) ** 2 / (2 * S_i)
+            Z_i = (z_i_loc - z_coord_m - deflection_z) ** 2 / (2 * S_i)
 
             lbda = 1.0 * sigma_i ** 2 / S_i * np.exp(-Y_i) * np.exp(-Z_i)
 
@@ -182,7 +185,8 @@ class CumulativeCurlMisalignmentVelocityDeficit(BaseModel):
         # super gaussian
         # b_f = self.b_f1 * np.exp(self.b_f2 * TI) + self.b_f3
         x_tilde = np.abs(delta_x) / turbine_diameter[:,:,ii:ii+1]
-        r_tilde = np.sqrt( (y_loc - y_i_loc - deflection_field) ** 2 + (z_loc - z_i_loc) ** 2 )
+        r_tilde = np.sqrt( (y_loc - y_i_loc - deflection_y) ** 2 \
+                          + (z_loc - z_i_loc - deflection_z) ** 2 )
         r_tilde /= turbine_diameter[:,:,ii:ii+1]
 
         n = self.a_f * np.exp(self.b_f * x_tilde) + self.c_f
@@ -192,7 +196,7 @@ class CumulativeCurlMisalignmentVelocityDeficit(BaseModel):
         # based on Blondel model, modified to include cumulative effects
         tmp = a2 - (
             (n * turbine_Ct[:,:,ii:ii+1])
-            * cosd(turbine_yaw)
+            * cosd(misalignment_angle_i)
             / (
                 16.0
                 * gamma(2 / n)
@@ -213,7 +217,7 @@ class CumulativeCurlMisalignmentVelocityDeficit(BaseModel):
         Ctmp[ii] = C
 
         yR = y_loc - y_i_loc
-        xR = yR * tand(turbine_yaw) + x_i
+        xR = yR * tand(misalignment_angle_i) + x_i
 
         # add turbines together
         velDef = C * np.exp((-1 * r_tilde ** n) / (2 * sigma_n ** 2))

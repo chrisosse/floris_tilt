@@ -162,6 +162,32 @@ def tand(angle):
     """
     return np.tan(np.radians(angle))
 
+def arctan2d(y, x):
+    """
+    Arctangent of y / x. Returns angle in degrees. Takes the quadrant
+    in condideration.
+
+    Args:
+        y (float): y length.
+        x (float): x length.
+
+    Returns:
+        float
+    """
+    return np.degrees(np.arctan2(y, x))
+
+def arccosd(x):
+    """
+    Arccosine of x. Returns angle in degrees.
+
+    Args:
+        x (float): arc.
+
+    Returns:
+        float
+    """
+    return np.degrees(np.arccos(x))
+
 
 def wrap_180(x):
     """

@@ -22,7 +22,7 @@ from floris.simulation import (
     Grid,
     Turbine,
 )
-from floris.utilities import cosd, sind
+from floris.utilities import cosd, sind, arccosd, arctan2d
 
 
 @define
@@ -102,7 +102,7 @@ class GaussMisalignmentVelocityDeflection(BaseModel):
         self,
         x_i: np.ndarray,
         y_i: np.ndarray,
-        yaw_i: np.ndarray,
+        misalignment_angle_i: np.ndarray,
         turbulence_intensity_i: np.ndarray,
         ct_i: np.ndarray,
         rotor_diameter_i: float,
@@ -140,9 +140,6 @@ class GaussMisalignmentVelocityDeflection(BaseModel):
         """
         # ==============================================================
 
-        # Opposite sign convention in this model
-        yaw_i = -1 * yaw_i
-
         # TODO: connect support for tilt
         tilt = 0.0 #turbine.tilt_angle
 
@@ -150,16 +147,15 @@ class GaussMisalignmentVelocityDeflection(BaseModel):
         uR = (
             freestream_velocity
           * ct_i
-          * cosd(tilt)
-          * cosd(yaw_i)
-          / (2.0 * (1 - np.sqrt(1 - (ct_i * cosd(tilt) * cosd(yaw_i)))))
+          * cosd(misalignment_angle_i)
+          / (2.0 * (1 - np.sqrt(1 - (ct_i * cosd(misalignment_angle_i)))))
         )
         u0 = freestream_velocity * np.sqrt(1 - ct_i)
 
         # length of near wake
         x0 = (
             rotor_diameter_i
-            * (cosd(yaw_i) * (1 + np.sqrt(1 - ct_i * cosd(yaw_i))))
+            * (cosd(misalignment_angle_i) * (1 + np.sqrt(1 - ct_i * cosd(misalignment_angle_i))))
             / (np.sqrt(2) * (
                 4 * self.alpha * turbulence_intensity_i + 2 * self.beta * (1 - np.sqrt(1 - ct_i))
             )) + x_i
@@ -173,17 +169,18 @@ class GaussMisalignmentVelocityDeflection(BaseModel):
         M0 = C0 * (2 - C0)
         E0 = C0 ** 2 - 3 * np.exp(1.0 / 12.0) * C0 + 3 * np.exp(1.0 / 3.0)
 
+        # TODO add wind veer and wake expansion dependent on angles
         # initial Gaussian wake expansion
         sigma_z0 = rotor_diameter_i * 0.5 * np.sqrt(uR / (freestream_velocity + u0))
-        sigma_y0 = sigma_z0 * cosd(yaw_i) * cosd(wind_veer)
+        sigma_y0 = sigma_z0 # * cosd(yaw_i) * cosd(wind_veer)
 
         # yR = y - y_i
         xR = x_i # yR * tand(yaw) + x_i
 
         # yaw parameters (skew angle and distance from centerline)
         # skew angle in radians
-        theta_c0 = self.dm * (0.3 * np.radians(yaw_i) / cosd(yaw_i))
-        theta_c0 *= (1 - np.sqrt(1 - ct_i * cosd(yaw_i)))
+        theta_c0 = self.dm * (0.3 * np.radians(misalignment_angle_i) / cosd(misalignment_angle_i))
+        theta_c0 *= (1 - np.sqrt(1 - ct_i * cosd(misalignment_angle_i)))
         delta0 = np.tan(theta_c0) * (x0 - x_i)  # initial wake deflection;
         # NOTE: use np.tan here since theta_c0 is radians
 
@@ -192,6 +189,7 @@ class GaussMisalignmentVelocityDeflection(BaseModel):
         delta_near_wake = delta_near_wake * np.array(x >= xR)
         delta_near_wake = delta_near_wake * np.array(x <= x0)
 
+        # TODO use same wake width trhoughout model
         # deflection in the far wake
         sigma_y = ky * (x - x0) + sigma_y0
         sigma_z = kz * (x - x0) + sigma_z0
@@ -220,6 +218,16 @@ class GaussMisalignmentVelocityDeflection(BaseModel):
 
 ## GCH components
 
+def misalignment_angles(
+    yaw_i,
+    tilt_i,
+):
+    phi = arccosd(cosd(yaw_i) * cosd(tilt_i))
+    alpha = arctan2d(sind(yaw_i) * cosd(tilt_i), sind(tilt_i))
+
+    return phi, alpha
+
+
 def gamma(
     D,
     velocity,
@@ -244,7 +252,7 @@ def gamma(
 
 
 # def calculate_effective_yaw(
-def wake_added_yaw(
+def wake_added_misalignment(
     u_i,
     v_i,
     u_initial,
@@ -345,7 +353,7 @@ def wake_added_yaw(
     return y[:,:,:,None,None]
 
 
-def calculate_transverse_velocity(
+def calculate_transverse_velocity_misalignment(
     u_i,
     u_initial,
     dudz_initial,
@@ -479,7 +487,7 @@ def calculate_transverse_velocity(
     return V, W
 
 
-def yaw_added_turbulence_mixing(
+def misalignment_added_turbulence_mixing(
     u_i,
     I_i,
     v_i,

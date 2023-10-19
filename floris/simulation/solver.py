@@ -34,8 +34,14 @@ from floris.simulation.wake_deflection.gauss import (
     wake_added_yaw,
     yaw_added_turbulence_mixing,
 )
+from floris.simulation.wake_deflection.gauss_misalignment import (
+    calculate_transverse_velocity_misalignment,
+    wake_added_misalignment,
+    misalignment_added_turbulence_mixing,
+    misalignment_angles,
+)
 from floris.type_dec import NDArrayFloat
-from floris.utilities import cosd
+from floris.utilities import sind, cosd
 
 
 def calculate_area_overlap(wake_velocities, freestream_velocities, y_ngrid, z_ngrid):
@@ -941,14 +947,28 @@ def ccm_solver(
 
         turbulence_intensity_i = turbine_turbulence_intensity[:, :, i:i+1]
         yaw_angle_i = farm.yaw_angles_sorted[:, :, i:i+1, None, None]
+        tilt_angle_i = farm.tilt_angles_sorted[:, :, i:i+1, None, None]
         hub_height_i = farm.hub_heights_sorted[: ,:, i:i+1, None, None]
         TSR_i = farm.TSRs_sorted[: ,:, i:i+1, None, None]
 
         effective_yaw_i = np.zeros_like(yaw_angle_i)
         effective_yaw_i += yaw_angle_i
+        effective_tilt_i = np.zeros_like(tilt_angle_i)
+        effective_tilt_i += tilt_angle_i
+
+        misalignment_angle_i, deflection_angle_i = misalignment_angles(
+            yaw_angle_i, 
+            tilt_angle_i,
+            )
+
+        # TODO Implement effective angles
+        effective_misalignment_angle_i = np.zeros_like(yaw_angle_i)
+        effective_misalignment_angle_i += misalignment_angle_i
+        effective_deflection_angle_i = np.zeros_like(yaw_angle_i)
+        effective_deflection_angle_i += deflection_angle_i
 
         if model_manager.enable_secondary_steering:
-            added_yaw = wake_added_yaw(
+            added_yaw = wake_added_misalignment(
                 u_i,
                 v_i,
                 flow_field.u_initial_sorted,
@@ -968,15 +988,22 @@ def ccm_solver(
         deflection_field = model_manager.deflection_model.function(
             x_i,
             y_i,
-            effective_yaw_i,
+            effective_misalignment_angle_i,
             turbulence_intensity_i,
             turb_Cts[:, :, i:i+1],
             rotor_diameter_i,
             **deflection_model_args
         )
 
+        # deflection_y = sind(deflection_angle_i) * deflection_field
+        # deflection_z = cosd(deflection_angle_i) * deflection_field
+
+        # print('Deflection y:        ', deflection_y)
+        # print('Deflection z:        ', deflection_z)
+        # print('deflection_angle_i:  ', deflection_angle_i)
+
         if model_manager.enable_transverse_velocities:
-            v_wake, w_wake = calculate_transverse_velocity(
+            v_wake, w_wake = calculate_transverse_velocity_misalignment(
                 u_i,
                 flow_field.u_initial_sorted,
                 flow_field.dudz_initial_sorted,
@@ -993,7 +1020,7 @@ def ccm_solver(
             )
 
         if model_manager.enable_yaw_added_recovery:
-            I_mixing = yaw_added_turbulence_mixing(
+            I_mixing = misalignment_added_turbulence_mixing(
                 u_i,
                 turbulence_intensity_i,
                 v_i,
@@ -1011,7 +1038,8 @@ def ccm_solver(
             z_i,
             u_i,
             deflection_field,
-            yaw_angle_i,
+            misalignment_angle_i,
+            effective_deflection_angle_i,
             turbine_turbulence_intensity,
             turb_Cts,
             farm.rotor_diameters_sorted[:, :, :, None, None],
@@ -1084,7 +1112,8 @@ def full_flow_ccm_solver(
     turbine_grid_farm.construct_turbine_fTilts()
     turbine_grid_farm.construct_turbine_correct_cp_ct_for_tilt()
     turbine_grid_farm.construct_coordinates()
-    turbine_grid_farm.set_tilt_to_ref_tilt(flow_field.n_wind_directions, flow_field.n_wind_speeds)
+    # NOTE Why is this done everywhere? 
+    # turbine_grid_farm.set_tilt_to_ref_tilt(flow_field.n_wind_directions, flow_field.n_wind_speeds)
 
     turbine_grid = TurbineGrid(
         turbine_coordinates=turbine_grid_farm.coordinates,
@@ -1169,15 +1198,29 @@ def full_flow_ccm_solver(
         turbulence_intensity_i = \
             turbine_grid_flow_field.turbulence_intensity_field_sorted_avg[:, :, i:i+1]
         yaw_angle_i = turbine_grid_farm.yaw_angles_sorted[:, :, i:i+1, None, None]
+        tilt_angle_i = turbine_grid_farm.tilt_angles_sorted[:, :, i:i+1, None, None]
         hub_height_i = turbine_grid_farm.hub_heights_sorted[: ,:, i:i+1, None, None]
         rotor_diameter_i = turbine_grid_farm.rotor_diameters_sorted[: ,:, i:i+1, None, None]
         TSR_i = turbine_grid_farm.TSRs_sorted[: ,:, i:i+1, None, None]
 
         effective_yaw_i = np.zeros_like(yaw_angle_i)
         effective_yaw_i += yaw_angle_i
+        effective_tilt_i = np.zeros_like(tilt_angle_i)
+        effective_tilt_i += tilt_angle_i
+
+        misalignment_angle_i, deflection_angle_i = misalignment_angles(
+            yaw_angle_i, 
+            tilt_angle_i,
+            )
+        
+        # TODO Implement effective angles
+        effective_misalignment_angle_i = np.zeros_like(yaw_angle_i)
+        effective_misalignment_angle_i += misalignment_angle_i
+        effective_deflection_angle_i = np.zeros_like(yaw_angle_i)
+        effective_deflection_angle_i += deflection_angle_i
 
         if model_manager.enable_secondary_steering:
-            added_yaw = wake_added_yaw(
+            added_yaw = wake_added_misalignment(
                 u_i,
                 v_i,
                 turbine_grid_flow_field.u_initial_sorted,
@@ -1197,15 +1240,22 @@ def full_flow_ccm_solver(
         deflection_field = model_manager.deflection_model.function(
             x_i,
             y_i,
-            effective_yaw_i,
+            effective_misalignment_angle_i,
             turbulence_intensity_i,
             turb_Cts[:, :, i:i+1],
             rotor_diameter_i,
             **deflection_model_args
         )
 
+        # deflection_y = sind(deflection_angle_i) * deflection_field
+        # deflection_z = cosd(deflection_angle_i) * deflection_field
+
+        # print('Deflection y:        ', deflection_y)
+        # print('Deflection z:        ', deflection_z)
+        # print('deflection_angle_i:  ', deflection_angle_i)
+
         if model_manager.enable_transverse_velocities:
-            v_wake, w_wake = calculate_transverse_velocity(
+            v_wake, w_wake = calculate_transverse_velocity_misalignment(
                 u_i,
                 flow_field.u_initial_sorted,
                 flow_field.dudz_initial_sorted,
@@ -1229,7 +1279,8 @@ def full_flow_ccm_solver(
             z_i,
             u_i,
             deflection_field,
-            yaw_angle_i,
+            misalignment_angle_i,
+            effective_deflection_angle_i,
             turbine_grid_flow_field.turbulence_intensity_field_sorted_avg,
             turb_Cts,
             turbine_grid_farm.rotor_diameters_sorted[:, :, :, None, None],

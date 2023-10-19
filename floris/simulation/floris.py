@@ -216,7 +216,7 @@ class Floris(BaseClass):
         # <<interface>>
         # start = time.time()
 
-        if vel_model in ["gauss", "cc", "ccm", "turbopark", "jensen"] and \
+        if vel_model in ["gauss", "cc", "turbopark", "jensen"] and \
             self.farm.correct_cp_ct_for_tilt.any():
             self.logger.warn(
                 "The current model does not account for vertical wake deflection due to " +
