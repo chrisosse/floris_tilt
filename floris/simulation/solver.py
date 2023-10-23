@@ -995,12 +995,6 @@ def ccm_solver(
             **deflection_model_args
         )
 
-        # deflection_y = sind(deflection_angle_i) * deflection_field
-        # deflection_z = cosd(deflection_angle_i) * deflection_field
-
-        # print('Deflection y:        ', deflection_y)
-        # print('Deflection z:        ', deflection_z)
-        # print('deflection_angle_i:  ', deflection_angle_i)
 
         if model_manager.enable_transverse_velocities:
             v_wake, w_wake = calculate_transverse_velocity_misalignment(
@@ -1012,7 +1006,10 @@ def ccm_solver(
                 grid.z_sorted,
                 rotor_diameter_i,
                 hub_height_i,
-                yaw_angle_i,
+                deflection_field,
+                misalignment_angle_i,
+                deflection_angle_i,
+                effective_deflection_angle_i,
                 turb_Cts[:, :, i:i+1],
                 TSR_i,
                 axial_induction_i,
@@ -1247,12 +1244,6 @@ def full_flow_ccm_solver(
             **deflection_model_args
         )
 
-        # deflection_y = sind(deflection_angle_i) * deflection_field
-        # deflection_z = cosd(deflection_angle_i) * deflection_field
-
-        # print('Deflection y:        ', deflection_y)
-        # print('Deflection z:        ', deflection_z)
-        # print('deflection_angle_i:  ', deflection_angle_i)
 
         if model_manager.enable_transverse_velocities:
             v_wake, w_wake = calculate_transverse_velocity_misalignment(
@@ -1264,7 +1255,10 @@ def full_flow_ccm_solver(
                 flow_field_grid.z_sorted,
                 rotor_diameter_i,
                 hub_height_i,
-                yaw_angle_i,
+                deflection_field,
+                misalignment_angle_i,
+                deflection_angle_i,
+                effective_deflection_angle_i,
                 turb_Cts[:, :, i:i+1],
                 TSR_i,
                 axial_induction_i,
