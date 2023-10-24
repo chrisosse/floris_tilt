@@ -39,6 +39,7 @@ from floris.simulation.wake_deflection.gauss_misalignment import (
     wake_added_misalignment,
     misalignment_added_turbulence_mixing,
     misalignment_angles,
+    calculate_effective_angles,
 )
 from floris.type_dec import NDArrayFloat
 from floris.utilities import sind, cosd
@@ -928,6 +929,7 @@ def ccm_solver(
 
         u_i = turb_inflow_field[:, :, i:i+1]
         v_i = flow_field.v_sorted[:, :, i:i+1]
+        w_i = flow_field.w_sorted[:, :, i:i+1]
 
         axial_induction_i = axial_induction(
             velocities=flow_field.u_sorted,
@@ -961,16 +963,27 @@ def ccm_solver(
             tilt_angle_i,
             )
 
-        # TODO Implement effective angles
         effective_misalignment_angle_i = np.zeros_like(yaw_angle_i)
         effective_misalignment_angle_i += misalignment_angle_i
         effective_deflection_angle_i = np.zeros_like(yaw_angle_i)
         effective_deflection_angle_i += deflection_angle_i
 
+        ######
+        debug = False
+        if debug:
+            print('No visual')
+            print('  Turbine number:        ', i)
+            print('    Tilt:                ', round(tilt_angle_i[0, 0, 0, 0, 0], 2))
+            print('    Yaw:                 ', round(yaw_angle_i[0, 0, 0, 0, 0], 2))
+            print('    Deflection:          ', round(deflection_angle_i[0, 0, 0, 0, 0], 2))
+            print('    Misalignment:        ', round(misalignment_angle_i[0, 0, 0, 0, 0], 2))
+        ######
+
         if model_manager.enable_secondary_steering:
-            added_yaw = wake_added_misalignment(
+            eff_deflection_angle_i, eff_misalignment_angle_i = wake_added_misalignment(
                 u_i,
                 v_i,
+                w_i,
                 flow_field.u_initial_sorted,
                 grid.y_sorted[:, :, i:i+1] - y_i,
                 grid.z_sorted[:, :, i:i+1],
@@ -981,7 +994,28 @@ def ccm_solver(
                 axial_induction_i,
                 scale=2.0,
             )
-            effective_yaw_i += added_yaw
+            
+            ######
+            if debug:
+                print('    Eff deflection:      ', round(eff_deflection_angle_i[0, 0, 0], 2))
+                print('    Eff misalignment:    ', round(eff_misalignment_angle_i[0, 0, 0], 2))
+            ######
+
+            new_deflection_angle_i, new_misalignment_angle_i = calculate_effective_angles(
+                deflection_angle_i,
+                misalignment_angle_i,
+                eff_deflection_angle_i,
+                eff_misalignment_angle_i,
+            )
+
+            ######
+            if debug:
+                print('    New deflection:      ', round(new_deflection_angle_i[0, 0, 0, 0, 0], 2))
+                print('    New misalignment:    ', round(new_misalignment_angle_i[0, 0, 0, 0, 0], 2))
+            ######
+
+            effective_deflection_angle_i = new_deflection_angle_i
+            effective_misalignment_angle_i = new_misalignment_angle_i
 
         # Model calculations
         # NOTE: exponential
@@ -1161,6 +1195,8 @@ def full_flow_ccm_solver(
 
         u_i = turbine_grid_flow_field.u_sorted[:, :, i:i+1]
         v_i = turbine_grid_flow_field.v_sorted[:, :, i:i+1]
+        w_i = turbine_grid_flow_field.w_sorted[:, :, i:i+1]
+
 
         turb_avg_vels = average_velocity(turbine_grid_flow_field.u_sorted)
         turb_Cts = Ct(
@@ -1210,16 +1246,16 @@ def full_flow_ccm_solver(
             tilt_angle_i,
             )
         
-        # TODO Implement effective angles
         effective_misalignment_angle_i = np.zeros_like(yaw_angle_i)
         effective_misalignment_angle_i += misalignment_angle_i
         effective_deflection_angle_i = np.zeros_like(yaw_angle_i)
         effective_deflection_angle_i += deflection_angle_i
 
         if model_manager.enable_secondary_steering:
-            added_yaw = wake_added_misalignment(
+            eff_deflection_angle_i, eff_misalignment_angle_i = wake_added_misalignment(
                 u_i,
                 v_i,
+                w_i,
                 turbine_grid_flow_field.u_initial_sorted,
                 turbine_grid.y_sorted[:, :, i:i+1] - y_i,
                 turbine_grid.z_sorted[:, :, i:i+1],
@@ -1230,7 +1266,16 @@ def full_flow_ccm_solver(
                 axial_induction_i,
                 scale=2.0
             )
-            effective_yaw_i += added_yaw
+
+            new_deflection_angle_i, new_misalignment_angle_i = calculate_effective_angles(
+                deflection_angle_i,
+                misalignment_angle_i,
+                eff_deflection_angle_i,
+                eff_misalignment_angle_i,
+            )
+
+            effective_deflection_angle_i = new_deflection_angle_i
+            effective_misalignment_angle_i = new_misalignment_angle_i
 
         # Model calculations
         # NOTE: exponential

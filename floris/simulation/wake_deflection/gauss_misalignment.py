@@ -22,7 +22,7 @@ from floris.simulation import (
     Grid,
     Turbine,
 )
-from floris.utilities import cosd, sind, arccosd, arctan2d
+from floris.utilities import cosd, sind, arccosd, arcsind, arctan2d
 
 
 @define
@@ -298,6 +298,7 @@ def vortex_velocities(
 def wake_added_misalignment(
     u_i,
     v_i,
+    w_i,
     u_initial,
     delta_y,
     z_i,
@@ -323,77 +324,229 @@ def wake_added_misalignment(
     Ct = ct_i                       # (wd, ws, 1, 1, 1) for the current turbine
     TSR = tip_speed_ratio           # scalar
     aI = axial_induction_i          # (wd, ws, 1, 1, 1) for the current turbine
-    avg_v = np.mean(v_i, axis=(3,4))  # (wd, ws, 1, grid, grid)
+
+    U_inf = np.mean(u_initial, axis=(2,3,4))
+    U_inf = U_inf[:,:,None,None,None]
+
+    U_turbine_avg = np.cbrt(np.mean(u_i ** 3, axis=(3,4)))
+    U_turbine_avg = U_turbine_avg[:,:,:,None,None]
+
+    Gamma_wr = -0.25 * 2 * np.pi * D * (aI - aI**2) * U_turbine_avg / TSR
+    r0_wr = 0.2 * D
+    decay = np.ones_like(v_i)
+
+    Y_wr = delta_y
+    Z_wr = z_i - HH
+    Y_wrg = delta_y
+    Z_wrg = z_i + HH
+
+    V_wr, W_wr = vortex_velocities(
+        Gamma_wr,
+        r0_wr, 
+        Y_wr, 
+        Z_wr,
+        decay,
+    )
+
+    V_wrg, W_wrg = vortex_velocities(
+        -Gamma_wr,
+        r0_wr, 
+        Y_wrg, 
+        Z_wrg,
+        decay,
+    )
+
+    # NOTE: Take care that only the velocity inside rotor plane averaged
+    V_i_eff = v_i - V_wr - V_wrg
+    W_i_eff = v_i - W_wr - W_wrg
+
+    U_i_transverse = np.sqrt(V_i_eff**2 + W_i_eff**2)
+    V_i_avg = np.mean(V_i_eff, axis=(3,4))
+    W_i_avg = np.mean(W_i_eff, axis=(3,4))
+
+    effective_deflection_angle = arctan2d(V_i_avg, W_i_avg)
+
+    U_transverse_avg = np.mean(U_i_transverse)
+
+    y_top, z_top, y_bot, z_bot = coordinates_top_bottom(effective_deflection_angle, D)
 
     # flow parameters
-    Uinf = np.mean(u_initial, axis=(2,3,4))
-    Uinf = Uinf[:,:,None,None,None]
+    # TODO: wind sheer is hard-coded here but should be connected to the input
+    U_inf = np.mean(u_initial, axis=(2,3,4))
+    U_inf = U_inf[:,:,None,None,None]
+    U_top = U_inf * ((HH + z_top) / HH) ** 0.12 * np.ones((1, 1, 1, 1, 1))
+    U_bot = U_inf * ((HH - z_bot) / HH) ** 0.12 * np.ones((1, 1, 1, 1, 1))
 
-    # TODO: Allow user input for eps gain
-    eps_gain = 0.2
-    eps = eps_gain * D  # Use set value
-
-    vel_top = ((HH + D / 2) / HH) ** 0.12 * np.ones((1, 1, 1, 1, 1))
-    Gamma_top = gamma(
+    Gamma_top = -gamma(
         D,
-        vel_top,
-        Uinf,
+        U_top,
+        U_inf,
         Ct,
-        scale,
+        scale=1,
     )
 
-    vel_bottom = ((HH - D / 2) / HH) ** 0.12 * np.ones((1, 1, 1, 1, 1))
-    Gamma_bottom = -1 * gamma(
+    Gamma_bot = gamma(
         D,
-        vel_bottom,
-        Uinf,
+        U_bot,
+        U_inf,
         Ct,
-        scale,
+        scale=1,
     )
 
-    turbine_average_velocity = np.cbrt(np.mean(u_i ** 3, axis=(3,4)))
-    turbine_average_velocity = turbine_average_velocity[:,:,:,None,None]
-    Gamma_wake_rotation = 0.25 * 2 * np.pi * D * (aI - aI ** 2) * turbine_average_velocity / TSR
+    # Core radius
+    r0_ma = 0.2 * D
 
-    ### compute the spanwise and vertical velocities induced by yaw
+    # Normalized coordinates 
+    Y_top = Y_wr - y_top
+    Z_top = Z_wr - z_top
+    Y_bot = Y_wr - y_bot
+    Z_bot = Z_wr - z_bot
 
-    # decay = eps ** 2 / (4 * nu * delta_x / Uinf + eps ** 2)   # This is the decay downstream
-    yLocs = delta_y + BaseModel.NUM_EPS
+    V_top, W_top = vortex_velocities(
+        Gamma_top,
+        r0_ma, 
+        Y_top, 
+        Z_top,
+        decay,
+    )
 
-    # top vortex
-    # NOTE: this is the top of the grid, not the top of the rotor
-    zT = z_i - (HH + D / 2) + BaseModel.NUM_EPS  # distance from the top of the grid
-    rT = yLocs ** 2 + zT ** 2  # TODO: This is - in the paper
-    # This looks like spanwise decay;
-    # it defines the vortex profile in the spanwise directions
-    core_shape = 1 - np.exp(-rT / (eps ** 2))
-    v_top = (Gamma_top * zT) / (2 * np.pi * rT) * core_shape
-    v_top = np.mean( v_top, axis=(3,4) )
-    # w_top = (-1 * Gamma_top * yLocs) / (2 * np.pi * rT) * core_shape * decay
+    V_bot, W_bot = vortex_velocities(
+        Gamma_bot,
+        r0_ma, 
+        Y_bot, 
+        Z_bot,
+        decay,
+    )
 
-    # bottom vortex
-    zB = z_i - (HH - D / 2) + BaseModel.NUM_EPS
-    rB = yLocs ** 2 + zB ** 2
-    core_shape = 1 - np.exp(-rB / (eps ** 2))
-    v_bottom = (Gamma_bottom * zB) / (2 * np.pi * rB) * core_shape
-    v_bottom = np.mean( v_bottom, axis=(3,4) )
-    # w_bottom = (-1 * Gamma_bottom * yLocs) / (2 * np.pi * rB) * core_shape * decay
+    # Normalized coordinates for ground effect
+    Y_topg = Y_wrg - y_top
+    Z_topg = Z_wrg + z_top
+    Y_botg = Y_wrg - y_bot
+    Z_botg = Z_wrg + z_bot
 
-    # wake rotation vortex
-    zC = z_i - HH + BaseModel.NUM_EPS
-    rC = yLocs ** 2 + zC ** 2
-    core_shape = 1 - np.exp(-rC / (eps ** 2))
-    v_core = (Gamma_wake_rotation * zC) / (2 * np.pi * rC) * core_shape
-    v_core = np.mean( v_core, axis=(3,4) )
-    # w_core = (-1 * Gamma_wake_rotation * yLocs) / (2 * np.pi * rC) * core_shape * decay
+    V_topg, W_topg = vortex_velocities(
+        -Gamma_top,
+        r0_ma, 
+        Y_topg, 
+        Z_topg,
+        decay,
+    )
 
-    # Cap the effective yaw values between -45 and 45 degrees
-    val = 2 * (avg_v - v_core) / (v_top + v_bottom)
-    val = np.where(val < -1.0, -1.0, val)
-    val = np.where(val > 1.0, 1.0, val)
-    y = np.degrees( 0.5 * np.arcsin( val ) )
+    V_botg, W_botg = vortex_velocities(
+        -Gamma_bot,
+        r0_ma, 
+        Y_botg, 
+        Z_botg,
+        decay,
+    )
 
-    return y[:,:,:,None,None]
+    V_ma = V_top + V_topg + V_bot + V_botg
+    W_ma = W_top + W_topg + W_bot + W_botg
+    
+    V_ma_avg = np.mean(V_ma)
+    W_ma_avg = np.mean(W_ma)
+    U_transverse_ma_avg = np.mean(np.sqrt(V_ma**2 + W_ma**2))
+    angle_ma = arctan2d(V_ma_avg, W_ma_avg)
+
+    U_transverse_ma_eff = U_transverse_ma_avg * cosd(effective_deflection_angle - angle_ma)
+
+    # NOTE: Maybe effective misalignment angle should be capped
+    # Solve equation U_trans_ma * sin(phi) * cos(phi) = U_trans_avg
+    value = 2 * (U_transverse_avg) / U_transverse_ma_eff
+    effective_misalignment_angle = np.degrees(0.5 * np.arcsin(value))
+
+    return effective_deflection_angle, effective_misalignment_angle
+
+
+    # # flow parameters
+    # Uinf = np.mean(u_initial, axis=(2,3,4))
+    # Uinf = Uinf[:,:,None,None,None]
+
+    # # TODO: Allow user input for eps gain
+    # eps_gain = 0.2
+    # eps = eps_gain * D  # Use set value
+
+    # vel_top = ((HH + D / 2) / HH) ** 0.12 * np.ones((1, 1, 1, 1, 1))
+    # Gamma_top = gamma(
+    #     D,
+    #     vel_top,
+    #     Uinf,
+    #     Ct,
+    #     scale,
+    # )
+
+    # vel_bottom = ((HH - D / 2) / HH) ** 0.12 * np.ones((1, 1, 1, 1, 1))
+    # Gamma_bottom = -1 * gamma(
+    #     D,
+    #     vel_bottom,
+    #     Uinf,
+    #     Ct,
+    #     scale,
+    # )
+
+    # turbine_average_velocity = np.cbrt(np.mean(u_i ** 3, axis=(3,4)))
+    # turbine_average_velocity = turbine_average_velocity[:,:,:,None,None]
+    # Gamma_wake_rotation = 0.25 * 2 * np.pi * D * (aI - aI ** 2) * turbine_average_velocity / TSR
+
+    # ### compute the spanwise and vertical velocities induced by yaw
+
+    # # decay = eps ** 2 / (4 * nu * delta_x / Uinf + eps ** 2)   # This is the decay downstream
+    # yLocs = delta_y + BaseModel.NUM_EPS
+
+    # # top vortex
+    # # NOTE: this is the top of the grid, not the top of the rotor
+    # zT = z_i - (HH + D / 2) + BaseModel.NUM_EPS  # distance from the top of the grid
+    # rT = yLocs ** 2 + zT ** 2  # TODO: This is - in the paper
+    # # This looks like spanwise decay;
+    # # it defines the vortex profile in the spanwise directions
+    # core_shape = 1 - np.exp(-rT / (eps ** 2))
+    # v_top = (Gamma_top * zT) / (2 * np.pi * rT) * core_shape
+    # v_top = np.mean( v_top, axis=(3,4) )
+    # # w_top = (-1 * Gamma_top * yLocs) / (2 * np.pi * rT) * core_shape * decay
+
+    # # bottom vortex
+    # zB = z_i - (HH - D / 2) + BaseModel.NUM_EPS
+    # rB = yLocs ** 2 + zB ** 2
+    # core_shape = 1 - np.exp(-rB / (eps ** 2))
+    # v_bottom = (Gamma_bottom * zB) / (2 * np.pi * rB) * core_shape
+    # v_bottom = np.mean( v_bottom, axis=(3,4) )
+    # # w_bottom = (-1 * Gamma_bottom * yLocs) / (2 * np.pi * rB) * core_shape * decay
+
+    # # wake rotation vortex
+    # zC = z_i - HH + BaseModel.NUM_EPS
+    # rC = yLocs ** 2 + zC ** 2
+    # core_shape = 1 - np.exp(-rC / (eps ** 2))
+    # v_core = (Gamma_wake_rotation * zC) / (2 * np.pi * rC) * core_shape
+    # v_core = np.mean( v_core, axis=(3,4) )
+    # # w_core = (-1 * Gamma_wake_rotation * yLocs) / (2 * np.pi * rC) * core_shape * decay
+
+    # # Cap the effective yaw values between -45 and 45 degrees
+    # val = 2 * (avg_v - v_core) / (v_top + v_bottom)
+    # val = np.where(val < -1.0, -1.0, val)
+    # val = np.where(val > 1.0, 1.0, val)
+    # y = np.degrees( 0.5 * np.arcsin( val ) )
+
+    # return y[:,:,:,None,None]
+
+
+def calculate_effective_angles(
+    deflection_angle,
+    misalignment_angle,
+    effective_deflection_angle, 
+    effective_misalignment_angle,
+):
+    y_new = sind(deflection_angle) * sind(misalignment_angle) \
+        + sind(effective_deflection_angle) * sind(effective_misalignment_angle)
+    z_new = cosd(deflection_angle) * sind(misalignment_angle) \
+        + cosd(effective_deflection_angle) * sind(effective_misalignment_angle)
+
+    effective_length = np.sqrt(y_new**2 + z_new**2)
+    effective_length[effective_length > 1] = 1
+
+    new_deflection_angle = arctan2d(y_new, z_new)
+    new_misalignment_angle = arcsind(effective_length)
+
+    return new_deflection_angle, new_misalignment_angle
 
 
 def calculate_transverse_velocity_misalignment(
@@ -431,7 +584,7 @@ def calculate_transverse_velocity_misalignment(
 
     # TODO: Make deflection of top and bottom point dependent on wake width
     # Deflection in y and z direction
-    y_component, z_component = deflection_components(deflection_angle)
+    y_component, z_component = deflection_components(effective_deflection_angle,)
     y_deflection = y_component * deflection
     z_deflection = z_component * deflection
 

@@ -331,6 +331,56 @@ class FlorisInterface(LoggerBase):
         df = df.sort_values(["x2", "x1"]).reset_index(drop=True)
 
         return df
+    
+
+    def calculate_full_domain(
+        self,
+        x_resolution=100,
+        y_resolution=100,
+        z_resolution=100,
+        x_bounds=None,
+        y_bounds=None,
+        z_bounds=(0,300),
+        wd=None,
+        ws=None,
+        yaw_angles=None,
+        tilt_angles=None,
+    ):
+        # TODO update docstring
+        if wd is None:
+            wd = self.floris.flow_field.wind_directions
+        if ws is None:
+            ws = self.floris.flow_field.wind_speeds
+        self.check_wind_condition_for_viz(wd=wd, ws=ws)
+
+        # Store the current state for reinitialization
+        floris_dict = self.floris.as_dict()
+        current_yaw_angles = yaw_angles
+        if yaw_angles is None:
+            current_yaw_angles = self.floris.farm.yaw_angles
+        current_tilt_angles = tilt_angles
+        if tilt_angles is None:
+            current_tilt_angles = self.floris.farm.tilt_angles
+
+        # Set the solver to a flow field planar grid
+        solver_settings = {
+            "type": "flow_field_grid",
+            "flow_field_grid_points": [x_resolution, y_resolution, z_resolution],
+            # "flow_field_bounds": [x_bounds, y_bounds, z_bounds],
+        }
+        self.reinitialize(wind_directions=wd, wind_speeds=ws, solver_settings=solver_settings)
+        
+        # TODO this has to be done here as it seems to be lost with reinitialize
+        if yaw_angles is not None:
+            self.floris.farm.yaw_angles = yaw_angles
+        if tilt_angles is not None:
+            self.floris.farm.tilt_angles = tilt_angles
+
+        # Calculate wake
+        self.floris.solve_for_viz()
+
+        return self.floris.grid, self.floris.flow_field
+
 
     def calculate_horizontal_plane(
         self,

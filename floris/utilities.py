@@ -189,6 +189,19 @@ def arccosd(x):
     return np.degrees(np.arccos(x))
 
 
+def arcsind(x):
+    """
+    Arcsine of x. Returns angle in degrees.
+
+    Args:
+        x (float): arc.
+
+    Returns:
+        float
+    """
+    return np.degrees(np.arcsin(x))
+
+
 def wrap_180(x):
     """
     Shift the given values to within the range (-180, 180].
