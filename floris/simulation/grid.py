@@ -462,7 +462,7 @@ class TurbineCubatureGrid(Grid):
         }
 
 @define
-class FlowFieldGrid(Grid):
+class FlowFieldGridBackup(Grid):
     """
     Args:
         grid_resolution (`Vec3`): The number of grid points to be created in each direction.
@@ -529,6 +529,94 @@ class FlowFieldGrid(Grid):
                 x_center_of_rotation=self.x_center_of_rotation,
                 y_center_of_rotation=self.y_center_of_rotation,
             )
+        
+
+@define
+class FlowFieldGrid(Grid):
+    """
+    Args:
+        grid_resolution (`Vec3`): The number of grid points to be created in each direction.
+        turbine_coordinates (`list[Vec3]`): The collection of turbine coordinate (`Vec3`) objects.
+        reference_turbine_diameter (:py:obj:`float`): The reference turbine's rotor diameter.
+        grid_resolution (:py:obj:`int`): The number of points on each turbine
+    """
+    x_center_of_rotation: NDArrayFloat = field(init=False)
+    y_center_of_rotation: NDArrayFloat = field(init=False)
+    x1_bounds: tuple = field(default=None)
+    x2_bounds: tuple = field(default=None)
+    x3_bounds: tuple = field(default=None)
+
+    def __attrs_post_init__(self) -> None:
+        super().__attrs_post_init__()
+        self.set_grid()
+
+    def set_grid(self) -> None:
+        """
+        Create a structured grid for the entire flow field domain.
+        resolution: Vec3
+
+        Calculates the domain bounds for the current wake model. The bounds
+        are calculated based on preset extents from the
+        given layout. The bounds consist of the minimum and maximum values
+        in the x-, y-, and z-directions.
+
+        If the Curl model is used, the predefined bounds are always set.
+
+        First, sort the turbines so that we know the bounds in the correct orientation.
+        Then, create the grid based on this wind-from-left orientation
+        """
+
+        # These are the rotated coordinates of the wind turbines based on the wind direction
+        x, y, z, self.x_center_of_rotation, self.y_center_of_rotation = rotate_coordinates_rel_west(
+            self.wind_directions,
+            self.turbine_coordinates_array
+        )
+
+        eps = 0.01
+        max_diameter = np.max(self.reference_turbine_diameter)
+
+        if self.x1_bounds is None:
+            self.x1_bounds = (np.min(x) - 2 * max_diameter, np.max(x) + 10 * max_diameter)
+
+        if self.x2_bounds is None:
+            self.x2_bounds = (np.min(y) - 2 * max_diameter, np.max(y) + 2 * max_diameter)
+
+        if self.x3_bounds is None:
+            self.x3_bounds = (0, 6 * max_diameter)
+
+        # Make y resolution equal to z resolution 
+        # TODO: Make it work only when y resolution is not specified
+        # if self.grid_resolution[1] is None:
+        distance_y = self.x2_bounds[1] - self.x2_bounds[0]
+        distance_z = self.x3_bounds[1] - self.x3_bounds[0]
+        self.grid_resolution[1] = distance_y * int(self.grid_resolution[2]) / distance_z
+
+        # Create grid inspace
+        x_points, y_points, z_points = np.meshgrid(
+            np.linspace(self.x1_bounds[0], self.x1_bounds[1], int(self.grid_resolution[0])),
+            np.linspace(self.x2_bounds[0], self.x2_bounds[1], int(self.grid_resolution[1])),
+            np.linspace(self.x3_bounds[0], self.x3_bounds[1], int(self.grid_resolution[2])),
+            indexing="ij"
+        )
+
+        # Make sure z is never zero to avoid numerical issues
+        z_points[z_points==0] = eps
+
+        self.x_sorted = x_points[None, None, :, :, :]
+        self.y_sorted = y_points[None, None, :, :, :]
+        self.z_sorted = z_points[None, None, :, :, :]
+
+        # Now calculate grid coordinates in original frame (from 270 deg perspective)
+        self.x_sorted_inertial_frame, self.y_sorted_inertial_frame, self.z_sorted_inertial_frame = \
+            reverse_rotate_coordinates_rel_west(
+                wind_directions=self.wind_directions,
+                grid_x=self.x_sorted,
+                grid_y=self.y_sorted,
+                grid_z=self.z_sorted,
+                x_center_of_rotation=self.x_center_of_rotation,
+                y_center_of_rotation=self.y_center_of_rotation,
+            )
+        
 
 @define
 class FlowFieldPlanarGrid(Grid):

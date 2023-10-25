@@ -118,6 +118,9 @@ class Floris(BaseClass):
                 wind_speeds=self.flow_field.wind_speeds,
                 grid_resolution=self.solver["flow_field_grid_points"],
                 time_series=self.flow_field.time_series,
+                x1_bounds=self.solver["flow_field_bounds"][0],
+                x2_bounds=self.solver["flow_field_bounds"][1],
+                x3_bounds=self.solver["flow_field_bounds"][2],
             )
         elif self.solver["type"] == "flow_field_planar_grid":
             self.grid = FlowFieldPlanarGrid(

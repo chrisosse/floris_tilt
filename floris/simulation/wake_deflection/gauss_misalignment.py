@@ -598,7 +598,7 @@ def calculate_transverse_velocity_misalignment(
     U_turbine_avg = np.cbrt(np.mean(u_i ** 3, axis=(3,4)))
     U_turbine_avg = U_turbine_avg[:,:,:,None,None]
 
-    Gamma_wr = -0.25 * 2 * np.pi * D * (aI - aI**2) * U_turbine_avg / TSR
+    Gamma_wr = np.pi * D * (aI - aI**2) * U_turbine_avg / TSR
 
     Gamma_top = -sind(misalignment_angle) * cosd(misalignment_angle) * gamma(
         D,
