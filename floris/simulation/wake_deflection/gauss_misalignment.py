@@ -358,22 +358,25 @@ def wake_added_misalignment(
 
     # NOTE: Take care that only the velocity inside rotor plane averaged
     V_i_eff = v_i - V_wr - V_wrg
-    W_i_eff = v_i - W_wr - W_wrg
+    W_i_eff = w_i - W_wr - W_wrg
 
     U_i_transverse = np.sqrt(V_i_eff**2 + W_i_eff**2)
+    
     V_i_avg = np.mean(V_i_eff, axis=(3,4))
+    V_i_avg = V_i_avg[:,:,:,None,None]
+    
     W_i_avg = np.mean(W_i_eff, axis=(3,4))
-
+    W_i_avg = W_i_avg[:,:,:,None,None]
+    
     effective_deflection_angle = arctan2d(V_i_avg, W_i_avg)
 
-    U_transverse_avg = np.mean(U_i_transverse)
+    U_transverse_avg = np.mean(U_i_transverse, axis=(3,4))
+    U_transverse_avg = U_transverse_avg[:,:,:,None,None]
 
     y_top, z_top, y_bot, z_bot = coordinates_top_bottom(effective_deflection_angle, D)
 
     # flow parameters
     # TODO: wind sheer is hard-coded here but should be connected to the input
-    U_inf = np.mean(u_initial, axis=(2,3,4))
-    U_inf = U_inf[:,:,None,None,None]
     U_top = U_inf * ((HH + z_top) / HH) ** 0.12 * np.ones((1, 1, 1, 1, 1))
     U_bot = U_inf * ((HH - z_bot) / HH) ** 0.12 * np.ones((1, 1, 1, 1, 1))
 
@@ -443,10 +446,16 @@ def wake_added_misalignment(
     V_ma = V_top + V_topg + V_bot + V_botg
     W_ma = W_top + W_topg + W_bot + W_botg
     
-    V_ma_avg = np.mean(V_ma)
-    W_ma_avg = np.mean(W_ma)
-    U_transverse_ma_avg = np.mean(np.sqrt(V_ma**2 + W_ma**2))
+    V_ma_avg = np.mean(V_ma, axis=(3,4))
+    V_ma_avg = V_ma_avg[:,:,:,None,None]
+
+    W_ma_avg = np.mean(W_ma, axis=(3,4))
+    W_ma_avg = W_ma_avg[:,:,:,None,None]
+
     angle_ma = arctan2d(V_ma_avg, W_ma_avg)
+
+    U_transverse_ma_avg = np.mean(np.sqrt(V_ma**2 + W_ma**2), axis=(3,4))
+    U_transverse_ma_avg = U_transverse_ma_avg[:,:,:,None,None]
 
     U_transverse_ma_eff = U_transverse_ma_avg * cosd(effective_deflection_angle - angle_ma)
 
@@ -456,77 +465,6 @@ def wake_added_misalignment(
     effective_misalignment_angle = np.degrees(0.5 * np.arcsin(value))
 
     return effective_deflection_angle, effective_misalignment_angle
-
-
-    # # flow parameters
-    # Uinf = np.mean(u_initial, axis=(2,3,4))
-    # Uinf = Uinf[:,:,None,None,None]
-
-    # # TODO: Allow user input for eps gain
-    # eps_gain = 0.2
-    # eps = eps_gain * D  # Use set value
-
-    # vel_top = ((HH + D / 2) / HH) ** 0.12 * np.ones((1, 1, 1, 1, 1))
-    # Gamma_top = gamma(
-    #     D,
-    #     vel_top,
-    #     Uinf,
-    #     Ct,
-    #     scale,
-    # )
-
-    # vel_bottom = ((HH - D / 2) / HH) ** 0.12 * np.ones((1, 1, 1, 1, 1))
-    # Gamma_bottom = -1 * gamma(
-    #     D,
-    #     vel_bottom,
-    #     Uinf,
-    #     Ct,
-    #     scale,
-    # )
-
-    # turbine_average_velocity = np.cbrt(np.mean(u_i ** 3, axis=(3,4)))
-    # turbine_average_velocity = turbine_average_velocity[:,:,:,None,None]
-    # Gamma_wake_rotation = 0.25 * 2 * np.pi * D * (aI - aI ** 2) * turbine_average_velocity / TSR
-
-    # ### compute the spanwise and vertical velocities induced by yaw
-
-    # # decay = eps ** 2 / (4 * nu * delta_x / Uinf + eps ** 2)   # This is the decay downstream
-    # yLocs = delta_y + BaseModel.NUM_EPS
-
-    # # top vortex
-    # # NOTE: this is the top of the grid, not the top of the rotor
-    # zT = z_i - (HH + D / 2) + BaseModel.NUM_EPS  # distance from the top of the grid
-    # rT = yLocs ** 2 + zT ** 2  # TODO: This is - in the paper
-    # # This looks like spanwise decay;
-    # # it defines the vortex profile in the spanwise directions
-    # core_shape = 1 - np.exp(-rT / (eps ** 2))
-    # v_top = (Gamma_top * zT) / (2 * np.pi * rT) * core_shape
-    # v_top = np.mean( v_top, axis=(3,4) )
-    # # w_top = (-1 * Gamma_top * yLocs) / (2 * np.pi * rT) * core_shape * decay
-
-    # # bottom vortex
-    # zB = z_i - (HH - D / 2) + BaseModel.NUM_EPS
-    # rB = yLocs ** 2 + zB ** 2
-    # core_shape = 1 - np.exp(-rB / (eps ** 2))
-    # v_bottom = (Gamma_bottom * zB) / (2 * np.pi * rB) * core_shape
-    # v_bottom = np.mean( v_bottom, axis=(3,4) )
-    # # w_bottom = (-1 * Gamma_bottom * yLocs) / (2 * np.pi * rB) * core_shape * decay
-
-    # # wake rotation vortex
-    # zC = z_i - HH + BaseModel.NUM_EPS
-    # rC = yLocs ** 2 + zC ** 2
-    # core_shape = 1 - np.exp(-rC / (eps ** 2))
-    # v_core = (Gamma_wake_rotation * zC) / (2 * np.pi * rC) * core_shape
-    # v_core = np.mean( v_core, axis=(3,4) )
-    # # w_core = (-1 * Gamma_wake_rotation * yLocs) / (2 * np.pi * rC) * core_shape * decay
-
-    # # Cap the effective yaw values between -45 and 45 degrees
-    # val = 2 * (avg_v - v_core) / (v_top + v_bottom)
-    # val = np.where(val < -1.0, -1.0, val)
-    # val = np.where(val > 1.0, 1.0, val)
-    # y = np.degrees( 0.5 * np.arcsin( val ) )
-
-    # return y[:,:,:,None,None]
 
 
 def calculate_effective_angles(
