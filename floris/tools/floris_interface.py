@@ -370,7 +370,7 @@ class FlorisInterface(LoggerBase):
         # Calculate wake
         self.floris.solve_for_viz()
 
-        return self.floris.grid, self.floris.flow_field
+        return self.floris.grid, self.floris.flow_field, self.floris.farm
 
 
     def calculate_horizontal_plane(

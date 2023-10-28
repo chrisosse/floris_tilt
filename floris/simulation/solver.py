@@ -875,9 +875,6 @@ def ccm_solver(
     # sigma_i = np.zeros((len(x_coord), len(wd), len(ws), len(x_coord), y_ngrid, z_ngrid))
 
     # Values that need to be available to all turbines
-    farm.tilt_angle_i = []
-    farm.yaw_angle_i = []
-
     farm.misalignment_angles = []
     farm.deflection_angles = []
     farm.deflections = []
@@ -889,6 +886,11 @@ def ccm_solver(
     farm.new_misalignment_angles = []
     farm.new_deflection_angles = []
     farm.new_deflections = []
+
+    # farm.deflection_angles = np.zeros((shape[0:3]))
+    
+    farm.y_new_deflections = np.zeros(shape[0:4])
+    farm.z_new_deflections = np.zeros(shape[0:4])
 
     # Calculate the velocity deficit sequentially from upstream to downstream turbines
     for i in range(grid.n_turbines):
@@ -969,9 +971,6 @@ def ccm_solver(
         hub_height_i = farm.hub_heights_sorted[: ,:, i:i+1, None, None]
         TSR_i = farm.TSRs_sorted[: ,:, i:i+1, None, None]
 
-        farm.yaw_angle_i.append(yaw_angle_i)
-        farm.tilt_angle_i.append(tilt_angle_i)
-
         misalignment_angle_i, deflection_angle_i = misalignment_angles(
             yaw_angle_i, 
             tilt_angle_i,
@@ -979,9 +978,6 @@ def ccm_solver(
 
         misalignment_angle_i = np.ones_like(yaw_angle_i) * misalignment_angle_i
         deflection_angle_i = np.ones_like(yaw_angle_i) * deflection_angle_i
-
-        farm.misalignment_angles.append(misalignment_angle_i)
-        farm.deflection_angles.append(deflection_angle_i)
 
         if model_manager.enable_secondary_steering:
             eff_deflection_angle_i, eff_misalignment_angle_i = wake_added_misalignment(
@@ -1018,11 +1014,6 @@ def ccm_solver(
             new_misalignment_angle_i = misalignment_angle_i
             new_deflection_angle_i = misalignment_angle_i
 
-        farm.eff_misalignment_angles.append(eff_misalignment_angle_i)
-        farm.eff_deflection_angles.append(eff_deflection_angle_i)
-        farm.new_misalignment_angles.append(new_misalignment_angle_i)
-        farm.new_deflection_angles.append(new_deflection_angle_i)
-
         # Model calculations
         # NOTE: exponential
         deflection_field = model_manager.deflection_model.function(
@@ -1034,8 +1025,6 @@ def ccm_solver(
             rotor_diameter_i,
             **deflection_model_args
         )
-
-        farm.deflections.append(deflection_field)
 
         if model_manager.enable_transverse_velocities:
             v_wake, w_wake = calculate_transverse_velocity_misalignment(
@@ -1118,6 +1107,21 @@ def ccm_solver(
         )
         flow_field.v_sorted += v_wake
         flow_field.w_sorted += w_wake
+
+        # Save angles and deflections to Farm
+        farm.misalignment_angles.append(misalignment_angle_i[:, :, 0, 0, 0])
+        farm.deflection_angles.append(deflection_angle_i[:, :, 0, 0, 0])
+        
+        farm.eff_misalignment_angles.append(eff_misalignment_angle_i[:, :, 0, 0, 0])
+        farm.eff_deflection_angles.append(eff_deflection_angle_i[:, :, 0, 0, 0])
+        
+        farm.new_misalignment_angles.append(new_misalignment_angle_i[:, :, 0, 0, 0])
+        farm.new_deflection_angles.append(new_deflection_angle_i[:, :, 0, 0, 0])
+        farm.new_deflections.append(deflection_field[:, :, :, 0, 0])
+
+        farm.y_new_deflections[i] = (deflection_field * sind(new_deflection_angle_i))[:,:,:,0,0]
+        farm.z_new_deflections[i] = (deflection_field * cosd(new_deflection_angle_i))[:,:,:,0,0]
+
     flow_field.u_sorted = turb_inflow_field
 
     flow_field.turbulence_intensity_field_sorted = turbine_turbulence_intensity
@@ -1125,6 +1129,8 @@ def ccm_solver(
         turbine_turbulence_intensity,
         axis=(3,4)
     )
+
+    
 
 
 def full_flow_ccm_solver(
@@ -1188,6 +1194,22 @@ def full_flow_ccm_solver(
 
     shape = (farm.n_turbines,) + np.shape(flow_field.u_initial_sorted)
     Ctmp = np.zeros((shape))
+
+    # Values that need to be available to all turbines
+    farm.misalignment_angles = []
+    farm.deflection_angles = []
+    farm.deflections = []
+
+    farm.eff_misalignment_angles = []
+    farm.eff_deflection_angles = []
+    farm.eff_deflections = []
+
+    farm.new_misalignment_angles = []
+    farm.new_deflection_angles = []
+    farm.new_deflections = []
+
+    farm.y_new_deflections = np.zeros(shape[0:4])
+    farm.z_new_deflections = np.zeros(shape[0:4])
 
     # Calculate the velocity deficit sequentially from upstream to downstream turbines
     for i in range(flow_field_grid.n_turbines):
@@ -1284,12 +1306,58 @@ def full_flow_ccm_solver(
             effective_deflection_angle_i = new_deflection_angle_i
             effective_misalignment_angle_i = new_misalignment_angle_i
 
+
+
+
+        misalignment_angle_i, deflection_angle_i = misalignment_angles(
+            yaw_angle_i, 
+            tilt_angle_i,
+            )
+
+        misalignment_angle_i = np.ones_like(yaw_angle_i) * misalignment_angle_i
+        deflection_angle_i = np.ones_like(yaw_angle_i) * deflection_angle_i
+
+        if model_manager.enable_secondary_steering:
+            eff_deflection_angle_i, eff_misalignment_angle_i = wake_added_misalignment(
+                u_i,
+                v_i,
+                w_i,
+                turbine_grid_flow_field.u_initial_sorted,
+                turbine_grid.y_sorted[:, :, i:i+1] - y_i,
+                turbine_grid.z_sorted[:, :, i:i+1],
+                rotor_diameter_i,
+                hub_height_i,
+                turb_Cts[:, :, i:i+1],
+                TSR_i,
+                axial_induction_i,
+                scale=2.0
+            )
+
+            eff_misalignment_angle_i = np.ones_like(yaw_angle_i) * eff_misalignment_angle_i
+            eff_deflection_angle_i = np.ones_like(yaw_angle_i) * eff_deflection_angle_i
+
+            new_deflection_angle_i, new_misalignment_angle_i = calculate_effective_angles(
+                deflection_angle_i,
+                misalignment_angle_i,
+                eff_deflection_angle_i,
+                eff_misalignment_angle_i,
+            )
+
+            new_misalignment_angle_i = np.ones_like(yaw_angle_i) * new_misalignment_angle_i
+            new_deflection_angle_i = np.ones_like(yaw_angle_i) * new_deflection_angle_i
+
+        else:
+            eff_misalignment_angle_i = np.zeros_like(yaw_angle_i)
+            eff_deflection_angle_i = np.zeros_like(yaw_angle_i)
+            new_misalignment_angle_i = misalignment_angle_i
+            new_deflection_angle_i = misalignment_angle_i
+
         # Model calculations
         # NOTE: exponential
         deflection_field = model_manager.deflection_model.function(
             x_i,
             y_i,
-            effective_misalignment_angle_i,
+            new_misalignment_angle_i,
             turbulence_intensity_i,
             turb_Cts[:, :, i:i+1],
             rotor_diameter_i,
@@ -1310,7 +1378,7 @@ def full_flow_ccm_solver(
                 deflection_field,
                 misalignment_angle_i,
                 deflection_angle_i,
-                effective_deflection_angle_i,
+                new_deflection_angle_i,
                 turb_Cts[:, :, i:i+1],
                 TSR_i,
                 axial_induction_i,
@@ -1326,7 +1394,7 @@ def full_flow_ccm_solver(
             u_i,
             deflection_field,
             misalignment_angle_i,
-            effective_deflection_angle_i,
+            new_deflection_angle_i,
             turbine_grid_flow_field.turbulence_intensity_field_sorted_avg,
             turb_Cts,
             turbine_grid_farm.rotor_diameters_sorted[:, :, :, None, None],
@@ -1337,6 +1405,21 @@ def full_flow_ccm_solver(
 
         flow_field.v_sorted += v_wake
         flow_field.w_sorted += w_wake
+
+        # Save angles and deflections to Farm
+        farm.misalignment_angles.append(misalignment_angle_i[:, :, 0, 0, 0])
+        farm.deflection_angles.append(deflection_angle_i[:, :, 0, 0, 0])
+        
+        farm.eff_misalignment_angles.append(eff_misalignment_angle_i[:, :, 0, 0, 0])
+        farm.eff_deflection_angles.append(eff_deflection_angle_i[:, :, 0, 0, 0])
+        
+        farm.new_misalignment_angles.append(new_misalignment_angle_i[:, :, 0, 0, 0])
+        farm.new_deflection_angles.append(new_deflection_angle_i[:, :, 0, 0, 0])
+        farm.new_deflections.append(deflection_field[:, :, :, 0, 0])
+
+        farm.y_new_deflections[i] = (deflection_field * sind(new_deflection_angle_i))[:,:,:,0,0]
+        farm.z_new_deflections[i] = (deflection_field * cosd(new_deflection_angle_i))[:,:,:,0,0]
+
     flow_field.u_sorted = flow_field.u_initial_sorted - turb_u_wake
 
 
