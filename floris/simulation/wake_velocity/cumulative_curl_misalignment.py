@@ -66,175 +66,6 @@ class CumulativeCurlMisalignmentVelocityDeficit(BaseModel):
             "u_initial": flow_field.u_initial_sorted,
         }
         return kwargs
-
-    def functionbackup(
-        self,
-        ii: int,
-        x_i: np.ndarray,
-        y_i: np.ndarray,
-        z_i: np.ndarray,
-        u_i: np.ndarray,
-        misalignment_angle_i: np.ndarray,
-        y_deflection_i: np.ndarray,
-        z_deflection_i: np.ndarray,
-        turbulence_intensity: np.ndarray,
-        ct: np.ndarray,
-        turbine_diameter: np.ndarray,
-        turb_u_wake: np.ndarray,
-        Ctmp: np.ndarray,
-        y_deflections_n: np.ndarray,
-        z_deflections_n: np.ndarray,
-        # enforces the use of the below as keyword arguments and adherence to the
-        # unpacking of the results from prepare_function()
-        *,
-        x: np.ndarray,
-        y: np.ndarray,
-        z: np.ndarray,
-        u_initial: np.ndarray,
-    ) -> None:
-
-        turbine_Ct = ct
-        turbine_ti = turbulence_intensity
-
-        # TODO Should this be cbrt? This is done to match v2
-        turb_avg_vels = np.cbrt(np.mean(u_i ** 3, axis=(3,4)))
-        turb_avg_vels = turb_avg_vels[:,:,:,None,None]
-
-        delta_x = x - x_i
-
-        sigma_n = wake_expansion(
-            delta_x,
-            turbine_Ct[:,:,ii:ii+1],
-            turbine_ti[:,:,ii:ii+1],
-            turbine_diameter[:,:,ii:ii+1],
-            self.a_s,
-            self.b_s,
-            self.c_s1,
-            self.c_s2,
-        )
-
-        x_i_loc = np.mean(x_i, axis=(3,4))
-        x_i_loc = x_i_loc[:,:,:,None,None]
-
-        y_i_loc = np.mean(y_i, axis=(3,4))
-        y_i_loc = y_i_loc[:,:,:,None,None]
-
-        z_i_loc = np.mean(z_i, axis=(3,4))
-        z_i_loc = z_i_loc[:,:,:,None,None]
-
-        x_coord = np.mean(x, axis=(3,4))[:,:,:,None,None]
-
-        y_loc = y
-        y_coord = np.mean(y, axis=(3,4))[:,:,:,None,None]
-
-        z_loc = z # np.mean(z, axis=(3,4))
-        z_coord = np.mean(z, axis=(3,4))[:,:,:,None,None]
-
-        y_deflections_n = y_deflections_n[:,:,:,:,None,None]
-        z_deflections_n = z_deflections_n[:,:,:,:,None,None]
-
-        sum_lbda = np.zeros_like(u_initial)
-
-        for m in range(0, ii - 1):
-            x_coord_m = x_coord[:,:,m:m+1]
-            y_coord_m = y_coord[:,:,m:m+1]
-            z_coord_m = z_coord[:,:,m:m+1]
-
-            y_deflection_n = y_deflections_n[m:m+1,:,:,:,None,None]
-            z_deflection_n = z_deflections_n[m:m+1,:,:,:,None,None]
-
-            # For computing crossplanes, we don't need to compute downstream
-            # turbines from out crossplane position.
-            if x_coord[:,:,m:m+1].size == 0:
-                break
-
-            delta_x_m = x - x_coord_m
-
-            sigma_i = wake_expansion(
-                delta_x_m,
-                turbine_Ct[:,:,m:m+1],
-                turbine_ti[:,:,m:m+1],
-                turbine_diameter[:,:,m:m+1],
-                self.a_s,
-                self.b_s,
-                self.c_s1,
-                self.c_s2,
-            )
-
-            S_i = sigma_n ** 2 + sigma_i ** 2
-
-            Y_i = (y_i_loc - y_coord_m - y_deflection_n) ** 2 / (2 * S_i)
-            Z_i = (z_i_loc - z_coord_m - z_deflection_n) ** 2 / (2 * S_i)
-
-            lbda = 1.0 * sigma_i ** 2 / S_i * np.exp(-Y_i) * np.exp(-Z_i)
-
-            sum_lbda = sum_lbda + lbda * (Ctmp[m] / u_initial)
-
-        # Vectorized version of sum_lbda calc; has issues with y_coord (needs to be
-        # down-selected appropriately. Prelim. timings show vectorized form takes
-        # longer than for loop.)
-        # if ii >= 2:
-        #     S = sigma_n ** 2 + sigma_i[0:ii-1, :, :, :, :, :] ** 2
-        #     Y = (y_i_loc - y_coord - deflection_field) ** 2 / (2 * S)
-        #     Z = (z_i_loc - z_coord) ** 2 / (2 * S)
-
-        #     lbda = self.alpha_mod * sigma_i[0:ii-1, :, :, :, :, :] ** 2
-        #     lbda /= S * np.exp(-Y) * np.exp(-Z)
-        #     sum_lbda = np.sum(lbda * (Ctmp[0:ii-1, :, :, :, :, :] / u_initial), axis=0)
-        # else:
-        #     sum_lbda = 0.0
-
-        # sigma_i[ii] = sigma_n
-
-        # blondel
-        # super gaussian
-        # b_f = self.b_f1 * np.exp(self.b_f2 * TI) + self.b_f3
-        x_tilde = np.abs(delta_x) / turbine_diameter[:,:,ii:ii+1]
-        r_tilde = np.sqrt( (y_loc - y_i_loc - y_deflection_i) ** 2 \
-                          + (z_loc - z_i_loc - z_deflection_i) ** 2 )
-        r_tilde /= turbine_diameter[:,:,ii:ii+1]
-
-        n = self.a_f * np.exp(self.b_f * x_tilde) + self.c_f
-        a1 = 2 ** (2 / n - 1)
-        a2 = 2 ** (4 / n - 2)
-
-        # based on Blondel model, modified to include cumulative effects
-        tmp = a2 - (
-            (n * turbine_Ct[:,:,ii:ii+1])
-            * cosd(misalignment_angle_i)
-            / (
-                16.0
-                * gamma(2 / n)
-                * np.sign(sigma_n)
-                * (np.abs(sigma_n) ** (4 / n))
-                * (1 - sum_lbda) ** 2
-            )
-        )
-
-        # for some low wind speeds, tmp can become slightly negative, which causes NANs,
-        # so replace the slightly negative values with zeros
-        tmp = tmp * np.array(tmp >= 0)
-
-        C = a1 - np.sqrt(tmp)
-
-        C = C * (1 - sum_lbda)
-
-        Ctmp[ii] = C
-
-        yR = y_loc - y_i_loc
-        xR = x_i # + yR * tand(misalignment_angle_i)
-
-        # add turbines together
-        velDef = C * np.exp((-1 * r_tilde ** n) / (2 * sigma_n ** 2))
-
-        
-        velDef = velDef * np.array(x - xR >= 0.1)
-
-        turb_u_wake = turb_u_wake + turb_avg_vels * velDef
-        return (
-            turb_u_wake,
-            Ctmp,
-        )
     
 
     def function(
@@ -252,6 +83,7 @@ class CumulativeCurlMisalignmentVelocityDeficit(BaseModel):
         rotor_diameter: np.ndarray,
         turb_u_wake: np.ndarray,
         C_n: np.ndarray,
+        sigma_n: np.ndarray,
         y_deflections_n: np.ndarray,
         z_deflections_n: np.ndarray,
         # enforces the use of the below as keyword arguments and adherence to the
@@ -292,6 +124,8 @@ class CumulativeCurlMisalignmentVelocityDeficit(BaseModel):
 
         y_deflections_n = y_deflections_n[:,:,:,:,None,None]
         z_deflections_n = z_deflections_n[:,:,:,:,None,None]
+        
+        sigma_n = sigma_n[:,:,:,:,None,None]
 
         delta_x = x - x_i
 
@@ -306,6 +140,8 @@ class CumulativeCurlMisalignmentVelocityDeficit(BaseModel):
             self.c_s2,
         )
 
+        sigma_n[i] = sigma_i[:,:,:,0:1,0:1]
+
         sum_lbda = np.zeros_like(u_initial)
 
         for n in range(0, i - 1):
@@ -313,33 +149,17 @@ class CumulativeCurlMisalignmentVelocityDeficit(BaseModel):
             y_coord_n = y_coord[:,:,n:n+1]
             z_coord_n = z_coord[:,:,n:n+1]
 
-            y_deflection_n = y_deflections_n[n]
-            z_deflection_n = z_deflections_n[n]
-
             # For computing crossplanes, we don't need to compute downstream
             # turbines from out crossplane position.
             if x_coord[:,:,n:n+1].size == 0:
                 break
 
-            delta_x_n = x - x_coord_n
+            S_n = sigma_i ** 2 + sigma_n[n] ** 2
 
-            sigma_n = wake_expansion(
-                delta_x_n,
-                turbine_Ct[:,:,n:n+1],
-                turbine_ti[:,:,n:n+1],
-                rotor_diameter[:,:,n:n+1],
-                self.a_s,
-                self.b_s,
-                self.c_s1,
-                self.c_s2,
-            )
+            Y_n = ((y_i_loc - y_deflection_i) - (y_coord_n - y_deflections_n[n])) ** 2 / (2 * S_n)
+            Z_n = ((z_i_loc - z_deflection_i) - (z_coord_n - z_deflections_n[n])) ** 2 / (2 * S_n)
 
-            S_n = sigma_i ** 2 + sigma_n ** 2
-
-            Y_n = ((y_i_loc - y_deflection_i) - (y_coord_n - y_deflection_n)) ** 2 / (2 * S_n)
-            Z_n = ((z_i_loc - z_deflection_i) - (z_coord_n - z_deflection_n)) ** 2 / (2 * S_n)
-
-            lbda = 1.0 * sigma_n ** 2 / S_n * np.exp(-Y_n) * np.exp(-Z_n)
+            lbda = 1.0 * sigma_n[n] ** 2 / S_n * np.exp(-Y_n) * np.exp(-Z_n)
 
             sum_lbda = sum_lbda + lbda * (C_n[n] / u_initial)
 
@@ -407,6 +227,7 @@ class CumulativeCurlMisalignmentVelocityDeficit(BaseModel):
         return (
             turb_u_wake,
             C_n,
+            sigma_n,
         )
 
 
@@ -434,3 +255,31 @@ def wake_expansion(
     # Do this ^^ in the main function
 
     return sigma_y
+
+
+# # TODO: Make seperate model for wake width
+# def wake_expansion(
+#     delta_x,
+#     Ct_i,
+#     turbulence_intensity_i,
+#     rotor_diameter_i,
+#     misalignment_angle_i,
+#     a_s=0.179367259,
+#     b_s=0.0118889215,
+#     c_s1=0.0563691592,
+#     c_s2=0.13290157,
+# ):
+#     k_y = a_s * turbulence_intensity_i + b_s
+#     k_z = k_y
+
+#     beta = 0.5 * (1 + np.sqrt(1 - Ct_i * cosd*misalignment_angle_i)) / np.sqrt(1 - Ct_i)
+    
+#     sigma_z0 = (c_s1 * Ct_i + c_s2) * np.sqrt(beta)
+#     sigma_y0 = sigma_z0 * cosd(misalignment_angle_i)
+
+#     x_tilde = np.abs(delta_x) / rotor_diameter_i
+    
+#     sigma_y = k_y * x_tilde + sigma_y0
+#     sigma_z = k_z * x_tilde + sigma_z0
+
+#     return sigma_y, sigma_z

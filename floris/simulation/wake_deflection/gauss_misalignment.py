@@ -218,6 +218,34 @@ class GaussMisalignmentVelocityDeflection(BaseModel):
 
 ## GCH components
 
+# TODO: Make seperate model for wake width
+def wake_expansion(
+    delta_x,
+    Ct_i,
+    turbulence_intensity_i,
+    rotor_diameter_i,
+    misalignment_angle_i,
+    a_s=0.179367259,
+    b_s=0.0118889215,
+    c_s1=0.0563691592,
+    c_s2=0.13290157,
+):
+    k_y = a_s * turbulence_intensity_i + b_s
+    k_z = k_y
+
+    beta = 0.5 * (1 + np.sqrt(1 - Ct_i * cosd*misalignment_angle_i)) / np.sqrt(1 - Ct_i)
+    
+    sigma_z0 = (c_s1 * Ct_i + c_s2) * np.sqrt(beta)
+    sigma_y0 = sigma_z0 * cosd(misalignment_angle_i)
+
+    x_tilde = np.abs(delta_x) / rotor_diameter_i
+    
+    sigma_y = k_y * x_tilde + sigma_y0
+    sigma_z = k_z * x_tilde + sigma_z0
+
+    return sigma_y, sigma_z, sigma_y0, sigma_z0, k_y, k_z
+
+
 def misalignment_angles(
     yaw,
     tilt,

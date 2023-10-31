@@ -40,6 +40,7 @@ from floris.simulation.wake_deflection.gauss_misalignment import (
     misalignment_added_turbulence_mixing,
     misalignment_angles,
     calculate_new_deflection,
+    wake_expansion,
 )
 from floris.type_dec import NDArrayFloat
 from floris.utilities import sind, cosd
@@ -868,10 +869,8 @@ def ccm_solver(
     ambient_turbulence_intensity = flow_field.turbulence_intensity
 
     shape = (farm.n_turbines,) + np.shape(flow_field.u_initial_sorted)
-    Ctmp = np.zeros((shape))
-
-    farm.y_wake_widths = np.zeros(shape[0:4])
-    farm.z_wake_widths = np.zeros(shape[0:4])
+    C_n = np.zeros((shape))
+    farm.sigma_n = np.zeros(shape[0:4])
 
     farm.misalignment_angles = np.zeros(shape[0:3])
     farm.deflection_angles = np.zeros(shape[0:3])
@@ -972,6 +971,7 @@ def ccm_solver(
         deflection_angle_i = np.ones_like(yaw_angle_i) * deflection_angle_i
         
         # Model calculations
+
         deflection_i = model_manager.deflection_model.function(
             x_i,
             y_i,
@@ -1066,7 +1066,7 @@ def ccm_solver(
             gch_gain = 1.0
             turbine_turbulence_intensity[:, :, i:i+1] = turbulence_intensity_i + gch_gain * I_mixing
 
-        turb_u_wake, Ctmp = model_manager.velocity_model.function(
+        turb_u_wake, C_n, sigma_n = model_manager.velocity_model.function(
             i,
             x_i,
             y_i,
@@ -1079,11 +1079,14 @@ def ccm_solver(
             turb_Cts,
             farm.rotor_diameters_sorted[:, :, :, None, None],
             turb_u_wake,
-            Ctmp,
+            C_n,
+            farm.sigma_n,
             farm.new_y_deflections,
             farm.new_z_deflections,
             **deficit_model_args
         )
+
+        farm.sigma_n = sigma_n[:,:,:,:,0,0]
 
         wake_added_turbulence_intensity = model_manager.turbulence_model.function(
             ambient_turbulence_intensity,
@@ -1189,7 +1192,8 @@ def full_flow_ccm_solver(
     turb_u_wake = np.zeros_like(flow_field.u_initial_sorted)
 
     shape = (farm.n_turbines,) + np.shape(flow_field.u_initial_sorted)
-    Ctmp = np.zeros((shape))
+    C_n = np.zeros((shape))
+    farm.sigma_n = np.zeros(shape[0:4])
 
     farm.misalignment_angles = np.zeros(shape[0:3])
     farm.deflection_angles = np.zeros(shape[0:3])
@@ -1348,7 +1352,7 @@ def full_flow_ccm_solver(
             )
 
         # NOTE: exponential
-        turb_u_wake, Ctmp = model_manager.velocity_model.function(
+        turb_u_wake, C_n, sigma_n = model_manager.velocity_model.function(
             i,
             x_i,
             y_i,
@@ -1361,11 +1365,14 @@ def full_flow_ccm_solver(
             turb_Cts,
             turbine_grid_farm.rotor_diameters_sorted[:, :, :, None, None],
             turb_u_wake,
-            Ctmp,
+            C_n,
+            farm.sigma_n,
             farm.new_y_deflections,
             farm.new_z_deflections,
             **deficit_model_args
         )
+
+        farm.sigma_n = sigma_n[:,:,:,:,0,0]
 
         flow_field.v_sorted += v_wake
         flow_field.w_sorted += w_wake
