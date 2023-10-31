@@ -487,6 +487,24 @@ def calculate_effective_angles(
     return new_deflection_angle, new_misalignment_angle
 
 
+def calculate_new_deflection(
+    deflection_angle,
+    deflection,
+    eff_deflection_angle,
+    eff_deflection,
+):
+    y_deflection = sind(deflection_angle) * deflection
+    z_deflection = cosd(deflection_angle) * deflection
+
+    eff_y_deflection = sind(eff_deflection_angle) * eff_deflection
+    eff_z_deflection = cosd(eff_deflection_angle) * eff_deflection
+
+    new_y_deflection = y_deflection + eff_y_deflection
+    new_z_deflection = z_deflection + eff_z_deflection
+
+    return new_y_deflection, new_z_deflection
+
+
 def calculate_transverse_velocity_misalignment(
     u_i,
     u_initial,
@@ -496,10 +514,10 @@ def calculate_transverse_velocity_misalignment(
     z,
     rotor_diameter,
     hub_height,
-    deflection,
     misalignment_angle,
     deflection_angle,
-    effective_deflection_angle,
+    y_deflection,
+    z_deflection,
     ct_i,
     tsr_i,
     axial_induction_i,
@@ -519,12 +537,6 @@ def calculate_transverse_velocity_misalignment(
 
     # Top' and Bottom' coordinates from middle point
     y_top, z_top, y_bot, z_bot = coordinates_top_bottom(deflection_angle, D)
-
-    # TODO: Make deflection of top and bottom point dependent on wake width
-    # Deflection in y and z direction
-    y_component, z_component = deflection_components(effective_deflection_angle,)
-    y_deflection = y_component * deflection
-    z_deflection = z_component * deflection
 
     # flow parameters
     # TODO: wind sheer is hard-coded here but should be connected to the input
@@ -567,6 +579,7 @@ def calculate_transverse_velocity_misalignment(
     decay_ma = r0_ma ** 2 / (4 * nu * delta_x / U_inf + r0_ma ** 2)
 
     # Normalized coordinates 
+    # TODO: Make deflection of top and bottom point dependent on wake width
     Y_wr = delta_y - y_deflection
     Z_wr = z - HH - z_deflection
     Y_top = Y_wr - y_top
@@ -599,6 +612,7 @@ def calculate_transverse_velocity_misalignment(
     )
 
     # Normalized coordinates for ground effect
+    # TODO: Make deflection of top and bottom point dependent on wake width
     Y_wrg = delta_y - y_deflection
     Z_wrg = z + HH + z_deflection
     Y_topg = Y_wrg - y_top
