@@ -584,18 +584,36 @@ class FlowFieldGrid(Grid):
         if self.x3_bounds is None:
             self.x3_bounds = (0, 6 * max_diameter)
 
-        # Make y resolution equal to z resolution 
+        # TODO:Make y resolution equal to z resolution 
         # TODO: Make it work only when y resolution is not specified
         # if self.grid_resolution[1] is None:
-        distance_y = self.x2_bounds[1] - self.x2_bounds[0]
-        distance_z = self.x3_bounds[1] - self.x3_bounds[0]
-        self.grid_resolution[1] = distance_y * int(self.grid_resolution[2]) / distance_z
+        # distance_y = self.x2_bounds[1] - self.x2_bounds[0]
+        # distance_z = self.x3_bounds[1] - self.x3_bounds[0]
+        # self.grid_resolution[1] = distance_y * int(self.grid_resolution[2]) / distance_z
+
+        # Create points along axes
+        # NOTE: if statement allow custom grids filled in as bounds
+        # TODO: Make function such that custom grid can be filled in porperly
+        if len(self.x1_bounds) == 2:
+            X = np.linspace(self.x1_bounds[0], self.x1_bounds[1], int(self.grid_resolution[0]))
+        else:
+            X = self.x1_bounds
+
+        if len(self.x2_bounds) == 2:
+            Y = np.linspace(self.x2_bounds[0], self.x2_bounds[1], int(self.grid_resolution[1]))
+        else:
+            Y = self.x2_bounds
+
+        if len(self.x3_bounds) == 2:
+            Z = np.linspace(self.x3_bounds[0], self.x3_bounds[1], int(self.grid_resolution[2]))
+        else:
+            Z = self.x3_bounds
 
         # Create grid inspace
         x_points, y_points, z_points = np.meshgrid(
-            np.linspace(self.x1_bounds[0], self.x1_bounds[1], int(self.grid_resolution[0])),
-            np.linspace(self.x2_bounds[0], self.x2_bounds[1], int(self.grid_resolution[1])),
-            np.linspace(self.x3_bounds[0], self.x3_bounds[1], int(self.grid_resolution[2])),
+            X,
+            Y,
+            Z,
             indexing="ij"
         )
 
