@@ -43,6 +43,11 @@ class FlowField(BaseClass):
     reference_wind_height: float = field(converter=float)
     time_series : bool = field(default=False)
     heterogenous_inflow_config: dict = field(default=None)
+    # TODO: Create names that fit values for croos plane velocity profile
+    a: float = field(default=0)
+    b: float = field(default=0)
+    c: float = field(default=1)
+    d: float = field(default=0)
 
     n_wind_speeds: int = field(init=False)
     n_wind_directions: int = field(init=False)
@@ -133,6 +138,8 @@ class FlowField(BaseClass):
             * (grid.z_sorted) ** (self.wind_shear - 1)
         )
 
+        wind_profile_crossplane = self.a ** (self.b * grid.z_sorted + self.c) + self.d
+
         # If no hetergeneous inflow defined, then set all speeds ups to 1.0
         if self.het_map is None:
             speed_ups = 1.0
@@ -201,10 +208,15 @@ class FlowField(BaseClass):
                 (self.wind_speeds[None, :].T * dwind_profile_plane.T).T
                 * speed_ups
             )
+
+        # TODO: Make V dependent on velocity
+        self.v_initial_sorted = wind_profile_crossplane
+
         self.v_initial_sorted = np.zeros(
             np.shape(self.u_initial_sorted),
             dtype=self.u_initial_sorted.dtype
         )
+
         self.w_initial_sorted = np.zeros(
             np.shape(self.u_initial_sorted),
             dtype=self.u_initial_sorted.dtype
