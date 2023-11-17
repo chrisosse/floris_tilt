@@ -40,7 +40,6 @@ from floris.simulation.wake_deflection.gauss_misalignment import (
     misalignment_added_turbulence_mixing,
     misalignment_angles,
     calculate_new_deflection,
-    wake_expansion,
 )
 from floris.type_dec import NDArrayFloat
 from floris.utilities import sind, cosd
