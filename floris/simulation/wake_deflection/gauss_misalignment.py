@@ -74,6 +74,16 @@ class GaussMisalignmentVelocityDeflection(BaseModel):
     """
     ad: float = field(converter=float, default=0.0)
     bd: float = field(converter=float, default=0.0)
+    cd: float = field(converter=float, default=1.0) ###
+    dd: float = field(converter=float, default=0.0) ###
+    wr_gain: float = field(converter=float, default=1.0) ###
+    ma_gain: float = field(converter=float, default=1.0) ###
+    wr_decay_gain: float = field(converter=float, default=1.0) ###
+    ma_decay_gain: float = field(converter=float, default=1.0) ###
+    a_s: float = field(converter=float, default=0.179367259) ###
+    b_s: float = field(converter=float, default=0.0118889215) ###
+    c_s1: float = field(converter=float, default=0.0563691592) ###
+    c_s2: float = field(converter=float, default=0.13290157) ###
     alpha: float = field(converter=float, default=0.58)
     beta: float = field(converter=float, default=0.077)
     ka: float = field(converter=float, default=0.38)
@@ -97,15 +107,138 @@ class GaussMisalignmentVelocityDeflection(BaseModel):
         }
         return kwargs
 
+    # # @profile
+    # def function(
+    #     self,
+    #     x_i: np.ndarray,
+    #     y_i: np.ndarray,
+    #     misalignment_angle_i: np.ndarray,
+    #     deflection_angle_i: np.ndarray,
+    #     turbulence_intensity_i: np.ndarray,
+    #     ct_i: np.ndarray,
+    #     rotor_diameter_i: float,
+    #     *,
+    #     x: np.ndarray,
+    #     y: np.ndarray,
+    #     z: np.ndarray,
+    #     freestream_velocity: np.ndarray,
+    #     wind_veer: float,
+    # ):
+    #     """
+    #     Calculates the deflection field of the wake. See
+    #     :cite:`gdm-bastankhah2016experimental` and :cite:`gdm-King2019Controls`
+    #     for details on the methods used.
+
+    #     Args:
+    #         x_locations (np.array): An array of floats that contains the
+    #             streamwise direction grid coordinates of the flow field
+    #             domain (m).
+    #         y_locations (np.array): An array of floats that contains the grid
+    #             coordinates of the flow field domain in the direction normal to
+    #             x and parallel to the ground (m).
+    #         z_locations (np.array): An array of floats that contains the grid
+    #             coordinates of the flow field domain in the vertical
+    #             direction (m).
+    #         turbine (:py:obj:`floris.simulation.turbine`): Object that
+    #             represents the turbine creating the wake.
+    #         coord (:py:obj:`floris.utilities.Vec3`): Object containing
+    #             the coordinate of the turbine creating the wake (m).
+    #         flow_field (:py:class:`floris.simulation.flow_field`): Object
+    #             containing the flow field information for the wind farm.
+
+    #     Returns:
+    #         np.array: Deflection field for the wake.
+    #     """
+    #     # ==============================================================
+
+    #     # initial velocity deficits
+    #     uR = (
+    #         freestream_velocity
+    #       * ct_i
+    #       * cosd(misalignment_angle_i)
+    #       / (2.0 * (1 - np.sqrt(1 - (ct_i * cosd(misalignment_angle_i)))))
+    #     )
+    #     u0 = freestream_velocity * np.sqrt(1 - ct_i)
+
+    #     # length of near wake
+    #     x0 = (
+    #         rotor_diameter_i
+    #         * (cosd(misalignment_angle_i) * (1 + np.sqrt(1 - ct_i * cosd(misalignment_angle_i))))
+    #         / (np.sqrt(2) * (
+    #             4 * self.alpha * turbulence_intensity_i + 2 * self.beta * (1 - np.sqrt(1 - ct_i))
+    #         )) + x_i
+    #     )
+
+    #     # wake expansion parameters
+    #     ky = self.ka * turbulence_intensity_i + self.kb
+    #     kz = self.ka * turbulence_intensity_i + self.kb
+
+    #     C0 = 1 - u0 / freestream_velocity
+    #     M0 = C0 * (2 - C0)
+    #     E0 = C0 ** 2 - 3 * np.exp(1.0 / 12.0) * C0 + 3 * np.exp(1.0 / 3.0)
+
+    #     # TODO add wind veer and wake expansion dependent on angles
+    #     # initial Gaussian wake expansion
+    #     sigma_z0 = rotor_diameter_i * 0.5 * np.sqrt(uR / (freestream_velocity + u0))
+    #     sigma_y0 = sigma_z0 # * cosd(yaw_i) * cosd(wind_veer)
+
+    #     # yR = y - y_i
+    #     xR = x_i # yR * tand(yaw) + x_i
+
+    #     # yaw parameters (skew angle and distance from centerline)
+    #     # skew angle in radians
+    #     theta_c0 = self.dm * (0.3 * np.radians(misalignment_angle_i) / cosd(misalignment_angle_i))
+    #     theta_c0 *= (1 - np.sqrt(1 - ct_i * cosd(misalignment_angle_i)))
+    #     delta0 = np.tan(theta_c0) * (x0 - x_i)  # initial wake deflection;
+    #     # NOTE: use np.tan here since theta_c0 is radians
+
+    #     # deflection in the near wake
+    #     delta_near_wake = ((x - xR) / (x0 - xR)) * delta0 + (self.ad + self.bd * (x - x_i))
+    #     delta_near_wake = delta_near_wake * np.array(x >= xR)
+    #     delta_near_wake = delta_near_wake * np.array(x <= x0)
+
+    #     # TODO use same wake width trhoughout model
+    #     # deflection in the far wake
+    #     sigma_y = ky * (x - x0) + sigma_y0
+    #     sigma_z = kz * (x - x0) + sigma_z0
+    #     sigma_y = sigma_y * np.array(x >= x0) + sigma_y0 * np.array(x < x0)
+    #     sigma_z = sigma_z * np.array(x >= x0) + sigma_z0 * np.array(x < x0)
+
+    #     ln_deltaNum = (1.6 + np.sqrt(M0)) * (
+    #         1.6 * np.sqrt(sigma_y * sigma_z / (sigma_y0 * sigma_z0)) - np.sqrt(M0)
+    #     )
+    #     ln_deltaDen = (1.6 - np.sqrt(M0)) * (
+    #         1.6 * np.sqrt(sigma_y * sigma_z / (sigma_y0 * sigma_z0)) + np.sqrt(M0)
+    #     )
+
+    #     delta_far_wake = (
+    #         delta0
+    #       + theta_c0 * E0 / 5.2
+    #       * np.sqrt(sigma_y0 * sigma_z0 / (ky * kz * M0))
+    #       * np.log(ln_deltaNum / ln_deltaDen)
+    #       + (self.ad + self.bd * (x - x_i))
+    #     )
+
+    #     delta_far_wake = delta_far_wake * np.array(x > x0)
+    #     deflection = delta_near_wake + delta_far_wake
+    #     deflection = deflection * (self.cd + self.dd * np.abs(cosd(deflection_angle_i)))
+
+    #     return deflection
+
     # @profile
     def function(
         self,
         x_i: np.ndarray,
-        y_i: np.ndarray,
-        misalignment_angle_i: np.ndarray,
-        turbulence_intensity_i: np.ndarray,
-        ct_i: np.ndarray,
-        rotor_diameter_i: float,
+        misalignment_angle: np.ndarray,
+        deflection_angle: np.ndarray,
+        C_t: np.ndarray,
+        x0: np.ndarray,
+        k_y: np.ndarray,
+        k_z: np.ndarray,
+        sigma_y0: np.ndarray,
+        sigma_z0: np.ndarray,
+        sigma_y: np.ndarray,
+        sigma_z: np.ndarray,
         *,
         x: np.ndarray,
         y: np.ndarray,
@@ -139,79 +272,445 @@ class GaussMisalignmentVelocityDeflection(BaseModel):
             np.array: Deflection field for the wake.
         """
         # ==============================================================
+        C0 = 1 / 2 * (1 - np.sqrt(1 - C_t))
 
-        # initial velocity deficits
-        uR = (
-            freestream_velocity
-          * ct_i
-          * cosd(misalignment_angle_i)
-          / (2.0 * (1 - np.sqrt(1 - (ct_i * cosd(misalignment_angle_i)))))
-        )
-        u0 = freestream_velocity * np.sqrt(1 - ct_i)
+        M0 = C_t
 
-        # length of near wake
-        x0 = (
-            rotor_diameter_i
-            * (cosd(misalignment_angle_i) * (1 + np.sqrt(1 - ct_i * cosd(misalignment_angle_i))))
-            / (np.sqrt(2) * (
-                4 * self.alpha * turbulence_intensity_i + 2 * self.beta * (1 - np.sqrt(1 - ct_i))
-            )) + x_i
+        E0 = C0**2 - 3 * C0 * np.exp(1 / 12) + 3 * np.exp(1 / 3)
+
+        theta_0 = (
+            self.dm * (0.3 * np.radians(misalignment_angle) / cosd(misalignment_angle))
+            * (1 - np.sqrt(1 - C_t * cosd(misalignment_angle)))
         )
 
-        # wake expansion parameters
-        ky = self.ka * turbulence_intensity_i + self.kb
-        kz = self.ka * turbulence_intensity_i + self.kb
+        delta_0 = np.tan(theta_0) * (x0 - x_i)
 
-        C0 = 1 - u0 / freestream_velocity
-        M0 = C0 * (2 - C0)
-        E0 = C0 ** 2 - 3 * np.exp(1.0 / 12.0) * C0 + 3 * np.exp(1.0 / 3.0)
+        delta_near = ((x - x_i) / (x0 - x_i)) * delta_0 + (self.ad + self.bd * (x - x_i))
+        delta_near = delta_near * np.array(x >= x_i)
+        delta_near = delta_near * np.array(x <= x0)
 
-        # TODO add wind veer and wake expansion dependent on angles
-        # initial Gaussian wake expansion
-        sigma_z0 = rotor_diameter_i * 0.5 * np.sqrt(uR / (freestream_velocity + u0))
-        sigma_y0 = sigma_z0 # * cosd(yaw_i) * cosd(wind_veer)
-
-        # yR = y - y_i
-        xR = x_i # yR * tand(yaw) + x_i
-
-        # yaw parameters (skew angle and distance from centerline)
-        # skew angle in radians
-        theta_c0 = self.dm * (0.3 * np.radians(misalignment_angle_i) / cosd(misalignment_angle_i))
-        theta_c0 *= (1 - np.sqrt(1 - ct_i * cosd(misalignment_angle_i)))
-        delta0 = np.tan(theta_c0) * (x0 - x_i)  # initial wake deflection;
-        # NOTE: use np.tan here since theta_c0 is radians
-
-        # deflection in the near wake
-        delta_near_wake = ((x - xR) / (x0 - xR)) * delta0 + (self.ad + self.bd * (x - x_i))
-        delta_near_wake = delta_near_wake * np.array(x >= xR)
-        delta_near_wake = delta_near_wake * np.array(x <= x0)
-
-        # TODO use same wake width trhoughout model
-        # deflection in the far wake
-        sigma_y = ky * (x - x0) + sigma_y0
-        sigma_z = kz * (x - x0) + sigma_z0
-        sigma_y = sigma_y * np.array(x >= x0) + sigma_y0 * np.array(x < x0)
-        sigma_z = sigma_z * np.array(x >= x0) + sigma_z0 * np.array(x < x0)
-
-        ln_deltaNum = (1.6 + np.sqrt(M0)) * (
-            1.6 * np.sqrt(sigma_y * sigma_z / (sigma_y0 * sigma_z0)) - np.sqrt(M0)
+        ln_numerator = (
+            (1.6 + np.sqrt(M0)) 
+          * (1.6 * np.sqrt(sigma_y * sigma_z / (sigma_y0 * sigma_z0)) - np.sqrt(M0))
         )
-        ln_deltaDen = (1.6 - np.sqrt(M0)) * (
-            1.6 * np.sqrt(sigma_y * sigma_z / (sigma_y0 * sigma_z0)) + np.sqrt(M0)
+        ln_denominator = (
+            (1.6 - np.sqrt(M0))
+          * (1.6 * np.sqrt(sigma_y * sigma_z / (sigma_y0 * sigma_z0)) + np.sqrt(M0))
         )
 
-        delta_far_wake = (
-            delta0
-          + theta_c0 * E0 / 5.2
-          * np.sqrt(sigma_y0 * sigma_z0 / (ky * kz * M0))
-          * np.log(ln_deltaNum / ln_deltaDen)
+        delta_far = (
+            delta_0
+          + theta_0 * E0 / 5.2
+          * np.sqrt(sigma_y0 * sigma_z0 / (k_y * k_z * M0))
+          * np.log(ln_numerator / ln_denominator)
           + (self.ad + self.bd * (x - x_i))
         )
 
-        delta_far_wake = delta_far_wake * np.array(x > x0)
-        deflection = delta_near_wake + delta_far_wake
+        delta_far = delta_far * np.array(x > x0)
+        deflection = delta_near + delta_far
+
+        deflection = deflection * (self.cd + self.dd * np.abs(cosd(deflection_angle)))
 
         return deflection
+
+
+    def calculate_near_wake_length(
+        self,
+        x_i: np.ndarray,
+        misalignment_angle: np.ndarray,
+        TI: np.ndarray,
+        C_t: np.ndarray,
+        rotor_D: float,
+    ):
+        # Calculate length of near wake
+        x0 = (
+            (rotor_D * cosd(misalignment_angle) * (1 + np.sqrt(1 - C_t)))
+          / (np.sqrt(2) * (4 * self.alpha * TI + 2 * self.beta * (1 - np.sqrt(1 - C_t))))
+          + x_i
+        )
+
+        return x0
+
+
+    def calculate_wake_growth_rate(
+        self,
+        TI,
+    ):
+        # Calculate wake growth rate
+        k_y = self.a_s * TI + self.b_s
+        k_z = self.a_s * TI + self.b_s
+
+        return k_y, k_z
+    
+
+    def calculate_wake_width(
+        self,
+        misalignment_angle: np.ndarray,
+        C_t: np.ndarray,
+        x_i: np.ndarray, 
+        x0: np.ndarray, 
+        k_y: np.ndarray, 
+        k_z: np.ndarray,
+        rotor_D: float,
+        *,
+        x: np.ndarray,
+        y: np.ndarray,
+        z: np.ndarray,
+        freestream_velocity: np.ndarray,
+        wind_veer: float,
+    ):
+        # Calculate Beta
+        # beta = (1 + np.sqrt(1 - C_t * cosd(misalignment_angle))) / (2 * np.sqrt(1 - C_t))
+        beta = (1 + np.sqrt(1 - C_t)) / (2 * np.sqrt(1 - C_t))
+        
+        # Calculate near wake width
+        sigma_z0 = rotor_D * (self.c_s1 * C_t + self.c_s2) * beta
+        # sigma_y0 = sigma_z0 * cosd(misalignment_angle)
+        sigma_y0 = sigma_z0
+
+        # # Calculate far wake width
+        sigma_y = k_y * (x - x0) + sigma_y0
+        sigma_z = k_z * (x - x0) + sigma_z0
+
+        # Combine near and far wake width
+        sigma_y = sigma_y * np.array(x >= x0) + sigma_y0 * np.array(x < x0)
+        sigma_z = sigma_z * np.array(x >= x0) + sigma_z0 * np.array(x < x0)
+
+        # Calculate far wake width
+        # sigma_y = k_y * (x - x_i) + sigma_y0
+        # sigma_z = k_z * (x - x_i) + sigma_z0
+
+        return sigma_y0, sigma_z0, sigma_y, sigma_z
+
+
+    def calculate_transverse_velocity_misalignment(
+        self,
+        u_i,
+        u_initial,
+        dudz_initial,
+        delta_x,
+        delta_y,
+        z,
+        rotor_diameter,
+        hub_height,
+        misalignment_angle,
+        deflection_angle,
+        y_deflection,
+        z_deflection,
+        ct_i,
+        tsr_i,
+        axial_induction_i,
+        scale=1.0
+    ):
+        """
+        Calculate transverse velocity components for all downstream turbines
+        given the vortices at the current turbine.
+        """
+
+        # turbine parameters
+        D = rotor_diameter
+        HH = hub_height
+        Ct = ct_i
+        TSR = tsr_i
+        aI = axial_induction_i
+
+        # Top' and Bottom' coordinates from middle point
+        y_top, z_top, y_bot, z_bot = coordinates_top_bottom(deflection_angle, D)
+
+        # flow parameters
+        # TODO: wind sheer is hard-coded here but should be connected to the input
+        U_inf = np.mean(u_initial, axis=(2,3,4))
+        U_inf = U_inf[:,:,None,None,None]
+        U_top = U_inf * ((HH + z_top) / HH) ** 0.12 * np.ones((1, 1, 1, 1, 1))
+        U_bot = U_inf * ((HH - z_bot) / HH) ** 0.12 * np.ones((1, 1, 1, 1, 1))
+
+        U_turbine_avg = np.cbrt(np.mean(u_i ** 3, axis=(3,4)))
+        U_turbine_avg = U_turbine_avg[:,:,:,None,None]
+
+        Gamma_wr = np.pi * D * (aI - aI**2) * U_turbine_avg / TSR * self.wr_gain
+
+        Gamma_top = -sind(misalignment_angle) * cosd(misalignment_angle) * gamma(
+            D,
+            U_top,
+            U_inf,
+            Ct,
+            scale=1,
+        ) * self.ma_gain
+
+        Gamma_bot = sind(misalignment_angle) * cosd(misalignment_angle) * gamma(
+            D,
+            U_bot,
+            U_inf,
+            Ct,
+            scale=1,
+        ) * self.ma_gain
+
+        # Core radius
+        r0_wr = 0.2 * D
+        r0_ma = 0.2 * D
+
+        # Decay the vortices as they move downstream - using mixing length
+        lmda = D / 8
+        kappa = 0.41
+        lm = kappa * z / (1 + kappa * z / lmda)
+        nu = lm ** 2 * np.abs(dudz_initial)
+        decay_wr = r0_wr ** 2 / (4 * nu * delta_x / U_inf + r0_wr ** 2) * self.wr_decay_gain
+        decay_ma = r0_ma ** 2 / (4 * nu * delta_x / U_inf + r0_ma ** 2) * self.ma_decay_gain
+
+        # Normalized coordinates 
+        # TODO: Make deflection of top and bottom point dependent on wake width
+        Y_wr = delta_y - y_deflection
+        Z_wr = z - HH - z_deflection
+        Y_top = Y_wr - y_top
+        Z_top = Z_wr - z_top
+        Y_bot = Y_wr - y_bot
+        Z_bot = Z_wr - z_bot
+
+        V_top, W_top = vortex_velocities(
+            Gamma_top,
+            r0_ma, 
+            Y_top, 
+            Z_top,
+            decay_ma,
+        )
+
+        V_bot, W_bot = vortex_velocities(
+            Gamma_bot,
+            r0_ma, 
+            Y_bot, 
+            Z_bot,
+            decay_ma,
+        )
+
+        V_wr, W_wr = vortex_velocities(
+            Gamma_wr,
+            r0_wr, 
+            Y_wr, 
+            Z_wr,
+            decay_wr,
+        )
+
+        # Normalized coordinates for ground effect
+        # TODO: Make deflection of top and bottom point dependent on wake width
+        Y_wrg = delta_y - y_deflection
+        Z_wrg = z + HH + z_deflection
+        Y_topg = Y_wrg - y_top
+        Z_topg = Z_wrg + z_top
+        Y_botg = Y_wrg - y_bot
+        Z_botg = Z_wrg + z_bot
+
+        V_topg, W_topg = vortex_velocities(
+            -Gamma_top,
+            r0_ma, 
+            Y_topg, 
+            Z_topg,
+            decay_ma,
+        )
+
+        V_botg, W_botg = vortex_velocities(
+            -Gamma_bot,
+            r0_ma, 
+            Y_botg, 
+            Z_botg,
+            decay_ma,
+        )
+
+        V_wrg, W_wrg = vortex_velocities(
+            -Gamma_wr,
+            r0_wr, 
+            Y_wrg, 
+            Z_wrg,
+            decay_wr,
+        )
+
+        V = V_wr + V_wrg + V_top + V_topg + V_bot + V_botg
+        W = W_wr + W_wrg + W_top + W_topg + W_bot + W_botg
+
+        # no spanwise and vertical velocity upstream of the turbine
+        # V[delta_x < -1] = 0.0  # Subtract by 1 to avoid numerical issues on rotation
+        # W[delta_x < -1] = 0.0  # Subtract by 1 to avoid numerical issues on rotation
+        # TODO Should this be <= ? Shouldn't be adding V and W on the current turbine?
+        V[delta_x <= 0.0] = 0.0  # Subtract by 1 to avoid numerical issues on rotation
+        W[delta_x <= 0.0] = 0.0  # Subtract by 1 to avoid numerical issues on rotation
+
+        return V, W
+
+
+    # def calculate_effective_yaw(
+    def wake_added_misalignment(
+        self,
+        u_i,
+        v_i,
+        w_i,
+        u_initial,
+        delta_y,
+        z_i,
+        rotor_diameter,
+        hub_height,
+        ct_i,
+        tip_speed_ratio,
+        axial_induction_i,
+        scale=1.0,
+    ):
+        """
+        what yaw angle would have produced that same average spanwise velocity
+
+        These calculations focus around the current turbine. The formulation could
+        remove the dimension for n-turbines, but for consistency with other
+        similar equations it is left. However, the turbine dimension should
+        always have length 1.
+        """
+
+        # turbine parameters
+        D = rotor_diameter              # scalar
+        HH = hub_height                 # scalar
+        Ct = ct_i                       # (wd, ws, 1, 1, 1) for the current turbine
+        TSR = tip_speed_ratio           # scalar
+        aI = axial_induction_i          # (wd, ws, 1, 1, 1) for the current turbine
+
+        U_inf = np.mean(u_initial, axis=(2,3,4))
+        U_inf = U_inf[:,:,None,None,None]
+
+        U_turbine_avg = np.cbrt(np.mean(u_i ** 3, axis=(3,4)))
+        U_turbine_avg = U_turbine_avg[:,:,:,None,None]
+
+        Gamma_wr = -0.25 * 2 * np.pi * D * (aI - aI**2) * U_turbine_avg / TSR * self.wr_gain
+        r0_wr = 0.2 * D
+        decay = np.ones_like(v_i)
+
+        Y_wr = delta_y
+        Z_wr = z_i - HH
+        Y_wrg = delta_y
+        Z_wrg = z_i + HH
+
+        V_wr, W_wr = vortex_velocities(
+            Gamma_wr,
+            r0_wr, 
+            Y_wr, 
+            Z_wr,
+            decay,
+        )
+
+        V_wrg, W_wrg = vortex_velocities(
+            -Gamma_wr,
+            r0_wr, 
+            Y_wrg, 
+            Z_wrg,
+            decay,
+        )
+
+        # NOTE: Take care that only the velocity inside rotor plane averaged
+        V_i_eff = v_i - V_wr - V_wrg
+        W_i_eff = w_i - W_wr - W_wrg
+
+        U_i_transverse = np.sqrt(V_i_eff**2 + W_i_eff**2)
+        
+        V_i_avg = np.mean(V_i_eff, axis=(3,4))
+        V_i_avg = V_i_avg[:,:,:,None,None]
+        
+        W_i_avg = np.mean(W_i_eff, axis=(3,4))
+        W_i_avg = W_i_avg[:,:,:,None,None]
+        
+        effective_deflection_angle = arctan2d(V_i_avg, W_i_avg)
+
+        U_transverse_avg = np.mean(U_i_transverse, axis=(3,4))
+        U_transverse_avg = U_transverse_avg[:,:,:,None,None]
+
+        y_top, z_top, y_bot, z_bot = coordinates_top_bottom(effective_deflection_angle, D)
+
+        # flow parameters
+        # TODO: wind sheer is hard-coded here but should be connected to the input
+        U_top = U_inf * ((HH + z_top) / HH) ** 0.12 * np.ones((1, 1, 1, 1, 1))
+        U_bot = U_inf * ((HH - z_bot) / HH) ** 0.12 * np.ones((1, 1, 1, 1, 1))
+
+        Gamma_top = -gamma(
+            D,
+            U_top,
+            U_inf,
+            Ct,
+            scale=1,
+        ) * self.ma_gain
+
+        Gamma_bot = gamma(
+            D,
+            U_bot,
+            U_inf,
+            Ct,
+            scale=1,
+        ) * self.ma_gain
+
+        # Core radius
+        r0_ma = 0.2 * D
+
+        # Normalized coordinates 
+        Y_top = Y_wr - y_top
+        Z_top = Z_wr - z_top
+        Y_bot = Y_wr - y_bot
+        Z_bot = Z_wr - z_bot
+
+        V_top, W_top = vortex_velocities(
+            Gamma_top,
+            r0_ma, 
+            Y_top, 
+            Z_top,
+            decay,
+        )
+
+        V_bot, W_bot = vortex_velocities(
+            Gamma_bot,
+            r0_ma, 
+            Y_bot, 
+            Z_bot,
+            decay,
+        )
+
+        # Normalized coordinates for ground effect
+        Y_topg = Y_wrg - y_top
+        Z_topg = Z_wrg + z_top
+        Y_botg = Y_wrg - y_bot
+        Z_botg = Z_wrg + z_bot
+
+        V_topg, W_topg = vortex_velocities(
+            -Gamma_top,
+            r0_ma, 
+            Y_topg, 
+            Z_topg,
+            decay,
+        )
+
+        V_botg, W_botg = vortex_velocities(
+            -Gamma_bot,
+            r0_ma, 
+            Y_botg, 
+            Z_botg,
+            decay,
+        )
+
+        V_ma = V_top + V_topg + V_bot + V_botg
+        W_ma = W_top + W_topg + W_bot + W_botg
+        
+        V_ma_avg = np.mean(V_ma, axis=(3,4))
+        V_ma_avg = V_ma_avg[:,:,:,None,None]
+
+        W_ma_avg = np.mean(W_ma, axis=(3,4))
+        W_ma_avg = W_ma_avg[:,:,:,None,None]
+
+        angle_ma = arctan2d(V_ma_avg, W_ma_avg)
+
+        U_transverse_ma_avg = np.mean(np.sqrt(V_ma**2 + W_ma**2), axis=(3,4))
+        U_transverse_ma_avg = U_transverse_ma_avg[:,:,:,None,None]
+
+        U_transverse_ma_eff = U_transverse_ma_avg * cosd(effective_deflection_angle - angle_ma)
+
+        # NOTE: Maybe effective misalignment angle should be capped
+        # Solve equation U_trans_ma * sin(phi) * cos(phi) = U_trans_avg
+        value = 2 * (U_transverse_avg) / U_transverse_ma_eff
+        # Cap value between -1 and 1, to have right range for arcsin
+        value = np.clip(-1, 1, value)
+        effective_misalignment_angle = np.degrees(0.5 * np.arcsin(value))
+
+        return effective_deflection_angle, effective_misalignment_angle
+
 
 ## GCH components
 
@@ -291,181 +790,6 @@ def vortex_velocities(
     return V, W
 
 
-# def calculate_effective_yaw(
-def wake_added_misalignment(
-    u_i,
-    v_i,
-    w_i,
-    u_initial,
-    delta_y,
-    z_i,
-    rotor_diameter,
-    hub_height,
-    ct_i,
-    tip_speed_ratio,
-    axial_induction_i,
-    scale=1.0,
-):
-    """
-    what yaw angle would have produced that same average spanwise velocity
-
-    These calculations focus around the current turbine. The formulation could
-    remove the dimension for n-turbines, but for consistency with other
-    similar equations it is left. However, the turbine dimension should
-    always have length 1.
-    """
-
-    # turbine parameters
-    D = rotor_diameter              # scalar
-    HH = hub_height                 # scalar
-    Ct = ct_i                       # (wd, ws, 1, 1, 1) for the current turbine
-    TSR = tip_speed_ratio           # scalar
-    aI = axial_induction_i          # (wd, ws, 1, 1, 1) for the current turbine
-
-    U_inf = np.mean(u_initial, axis=(2,3,4))
-    U_inf = U_inf[:,:,None,None,None]
-
-    U_turbine_avg = np.cbrt(np.mean(u_i ** 3, axis=(3,4)))
-    U_turbine_avg = U_turbine_avg[:,:,:,None,None]
-
-    Gamma_wr = -0.25 * 2 * np.pi * D * (aI - aI**2) * U_turbine_avg / TSR
-    r0_wr = 0.2 * D
-    decay = np.ones_like(v_i)
-
-    Y_wr = delta_y
-    Z_wr = z_i - HH
-    Y_wrg = delta_y
-    Z_wrg = z_i + HH
-
-    V_wr, W_wr = vortex_velocities(
-        Gamma_wr,
-        r0_wr, 
-        Y_wr, 
-        Z_wr,
-        decay,
-    )
-
-    V_wrg, W_wrg = vortex_velocities(
-        -Gamma_wr,
-        r0_wr, 
-        Y_wrg, 
-        Z_wrg,
-        decay,
-    )
-
-    # NOTE: Take care that only the velocity inside rotor plane averaged
-    V_i_eff = v_i - V_wr - V_wrg
-    W_i_eff = w_i - W_wr - W_wrg
-
-    U_i_transverse = np.sqrt(V_i_eff**2 + W_i_eff**2)
-    
-    V_i_avg = np.mean(V_i_eff, axis=(3,4))
-    V_i_avg = V_i_avg[:,:,:,None,None]
-    
-    W_i_avg = np.mean(W_i_eff, axis=(3,4))
-    W_i_avg = W_i_avg[:,:,:,None,None]
-    
-    effective_deflection_angle = arctan2d(V_i_avg, W_i_avg)
-
-    U_transverse_avg = np.mean(U_i_transverse, axis=(3,4))
-    U_transverse_avg = U_transverse_avg[:,:,:,None,None]
-
-    y_top, z_top, y_bot, z_bot = coordinates_top_bottom(effective_deflection_angle, D)
-
-    # flow parameters
-    # TODO: wind sheer is hard-coded here but should be connected to the input
-    U_top = U_inf * ((HH + z_top) / HH) ** 0.12 * np.ones((1, 1, 1, 1, 1))
-    U_bot = U_inf * ((HH - z_bot) / HH) ** 0.12 * np.ones((1, 1, 1, 1, 1))
-
-    Gamma_top = -gamma(
-        D,
-        U_top,
-        U_inf,
-        Ct,
-        scale=1,
-    )
-
-    Gamma_bot = gamma(
-        D,
-        U_bot,
-        U_inf,
-        Ct,
-        scale=1,
-    )
-
-    # Core radius
-    r0_ma = 0.2 * D
-
-    # Normalized coordinates 
-    Y_top = Y_wr - y_top
-    Z_top = Z_wr - z_top
-    Y_bot = Y_wr - y_bot
-    Z_bot = Z_wr - z_bot
-
-    V_top, W_top = vortex_velocities(
-        Gamma_top,
-        r0_ma, 
-        Y_top, 
-        Z_top,
-        decay,
-    )
-
-    V_bot, W_bot = vortex_velocities(
-        Gamma_bot,
-        r0_ma, 
-        Y_bot, 
-        Z_bot,
-        decay,
-    )
-
-    # Normalized coordinates for ground effect
-    Y_topg = Y_wrg - y_top
-    Z_topg = Z_wrg + z_top
-    Y_botg = Y_wrg - y_bot
-    Z_botg = Z_wrg + z_bot
-
-    V_topg, W_topg = vortex_velocities(
-        -Gamma_top,
-        r0_ma, 
-        Y_topg, 
-        Z_topg,
-        decay,
-    )
-
-    V_botg, W_botg = vortex_velocities(
-        -Gamma_bot,
-        r0_ma, 
-        Y_botg, 
-        Z_botg,
-        decay,
-    )
-
-    V_ma = V_top + V_topg + V_bot + V_botg
-    W_ma = W_top + W_topg + W_bot + W_botg
-    
-    V_ma_avg = np.mean(V_ma, axis=(3,4))
-    V_ma_avg = V_ma_avg[:,:,:,None,None]
-
-    W_ma_avg = np.mean(W_ma, axis=(3,4))
-    W_ma_avg = W_ma_avg[:,:,:,None,None]
-
-    angle_ma = arctan2d(V_ma_avg, W_ma_avg)
-
-    U_transverse_ma_avg = np.mean(np.sqrt(V_ma**2 + W_ma**2), axis=(3,4))
-    U_transverse_ma_avg = U_transverse_ma_avg[:,:,:,None,None]
-
-    U_transverse_ma_eff = U_transverse_ma_avg * cosd(effective_deflection_angle - angle_ma)
-
-    # NOTE: Maybe effective misalignment angle should be capped
-    # Solve equation U_trans_ma * sin(phi) * cos(phi) = U_trans_avg
-    value = 2 * (U_transverse_avg) / U_transverse_ma_eff
-    # Cap value between -1 and 1, to have right range for arcsin
-    value = np.clip(-1, 1, value)
-    effective_misalignment_angle = np.degrees(0.5 * np.arcsin(value))
-
-    return effective_deflection_angle, effective_misalignment_angle
-
-
 def calculate_effective_angles(
     deflection_angle,
     misalignment_angle,
@@ -504,158 +828,6 @@ def calculate_new_deflection(
     return new_y_deflection, new_z_deflection
 
 
-def calculate_transverse_velocity_misalignment(
-    u_i,
-    u_initial,
-    dudz_initial,
-    delta_x,
-    delta_y,
-    z,
-    rotor_diameter,
-    hub_height,
-    misalignment_angle,
-    deflection_angle,
-    y_deflection,
-    z_deflection,
-    ct_i,
-    tsr_i,
-    axial_induction_i,
-    scale=1.0
-):
-    """
-    Calculate transverse velocity components for all downstream turbines
-    given the vortices at the current turbine.
-    """
-
-    # turbine parameters
-    D = rotor_diameter
-    HH = hub_height
-    Ct = ct_i
-    TSR = tsr_i
-    aI = axial_induction_i
-
-    # Top' and Bottom' coordinates from middle point
-    y_top, z_top, y_bot, z_bot = coordinates_top_bottom(deflection_angle, D)
-
-    # flow parameters
-    # TODO: wind sheer is hard-coded here but should be connected to the input
-    U_inf = np.mean(u_initial, axis=(2,3,4))
-    U_inf = U_inf[:,:,None,None,None]
-    U_top = U_inf * ((HH + z_top) / HH) ** 0.12 * np.ones((1, 1, 1, 1, 1))
-    U_bot = U_inf * ((HH - z_bot) / HH) ** 0.12 * np.ones((1, 1, 1, 1, 1))
-
-    U_turbine_avg = np.cbrt(np.mean(u_i ** 3, axis=(3,4)))
-    U_turbine_avg = U_turbine_avg[:,:,:,None,None]
-
-    Gamma_wr = np.pi * D * (aI - aI**2) * U_turbine_avg / TSR
-
-    Gamma_top = -sind(misalignment_angle) * cosd(misalignment_angle) * gamma(
-        D,
-        U_top,
-        U_inf,
-        Ct,
-        scale=1,
-    )
-
-    Gamma_bot = sind(misalignment_angle) * cosd(misalignment_angle) * gamma(
-        D,
-        U_bot,
-        U_inf,
-        Ct,
-        scale=1,
-    )
-
-    # Core radius
-    r0_wr = 0.2 * D
-    r0_ma = 0.2 * D
-
-    # Decay the vortices as they move downstream - using mixing length
-    lmda = D / 8
-    kappa = 0.41
-    lm = kappa * z / (1 + kappa * z / lmda)
-    nu = lm ** 2 * np.abs(dudz_initial)
-    decay_wr = r0_wr ** 2 / (4 * nu * delta_x / U_inf + r0_wr ** 2)
-    decay_ma = r0_ma ** 2 / (4 * nu * delta_x / U_inf + r0_ma ** 2)
-
-    # Normalized coordinates 
-    # TODO: Make deflection of top and bottom point dependent on wake width
-    Y_wr = delta_y - y_deflection
-    Z_wr = z - HH - z_deflection
-    Y_top = Y_wr - y_top
-    Z_top = Z_wr - z_top
-    Y_bot = Y_wr - y_bot
-    Z_bot = Z_wr - z_bot
-
-    V_top, W_top = vortex_velocities(
-        Gamma_top,
-        r0_ma, 
-        Y_top, 
-        Z_top,
-        decay_ma,
-    )
-
-    V_bot, W_bot = vortex_velocities(
-        Gamma_bot,
-        r0_ma, 
-        Y_bot, 
-        Z_bot,
-        decay_ma,
-    )
-
-    V_wr, W_wr = vortex_velocities(
-        Gamma_wr,
-        r0_wr, 
-        Y_wr, 
-        Z_wr,
-        decay_wr,
-    )
-
-    # Normalized coordinates for ground effect
-    # TODO: Make deflection of top and bottom point dependent on wake width
-    Y_wrg = delta_y - y_deflection
-    Z_wrg = z + HH + z_deflection
-    Y_topg = Y_wrg - y_top
-    Z_topg = Z_wrg + z_top
-    Y_botg = Y_wrg - y_bot
-    Z_botg = Z_wrg + z_bot
-
-    V_topg, W_topg = vortex_velocities(
-        -Gamma_top,
-        r0_ma, 
-        Y_topg, 
-        Z_topg,
-        decay_ma,
-    )
-
-    V_botg, W_botg = vortex_velocities(
-        -Gamma_bot,
-        r0_ma, 
-        Y_botg, 
-        Z_botg,
-        decay_ma,
-    )
-
-    V_wrg, W_wrg = vortex_velocities(
-        -Gamma_wr,
-        r0_wr, 
-        Y_wrg, 
-        Z_wrg,
-        decay_wr,
-    )
-
-    V = V_wr + V_wrg + V_top + V_topg + V_bot + V_botg
-    W = W_wr + W_wrg + W_top + W_topg + W_bot + W_botg
-
-    # no spanwise and vertical velocity upstream of the turbine
-    # V[delta_x < -1] = 0.0  # Subtract by 1 to avoid numerical issues on rotation
-    # W[delta_x < -1] = 0.0  # Subtract by 1 to avoid numerical issues on rotation
-    # TODO Should this be <= ? Shouldn't be adding V and W on the current turbine?
-    V[delta_x <= 0.0] = 0.0  # Subtract by 1 to avoid numerical issues on rotation
-    W[delta_x <= 0.0] = 0.0  # Subtract by 1 to avoid numerical issues on rotation
-
-    return V, W
-
-
 def misalignment_added_turbulence_mixing(
     u_i,
     I_i,
@@ -689,6 +861,7 @@ def misalignment_added_turbulence_mixing(
     I_mixing = I_total - I_i
 
     return I_mixing[:,:,None,None,None]
+    
 
 # def yaw_added_recovery_correction(
 #     self, U_local, U, W, x_locations, y_locations, turbine, turbine_coord
