@@ -33,7 +33,10 @@ from floris.type_dec import (
     NDArrayInt,
     NDArrayObject,
 )
-from floris.utilities import cosd
+from floris.utilities import (
+    cosd, 
+    arccosd,
+)
 
 
 def _filter_convert(
@@ -79,6 +82,20 @@ def _filter_convert(
     # Finally, we should have an index filter list of type Iterable,
     # so cast it to Numpy array and return
     return np.array(ix_filter)
+
+
+def _rotor_velocity_misalignment_correction(
+    pP: float,
+    yaw_angle: NDArrayFloat,
+    tilt_angle: NDArrayFloat,
+    rotor_effective_velocities: NDArrayFloat,
+) -> NDArrayFloat:
+    # Compute the rotor effective velocity adjusting for yaw settings
+    pW = pP / 3.0  # Convert from pP to w
+    misalignment_angle = arccosd(cosd(yaw_angle) * cosd(tilt_angle))
+    rotor_effective_velocities = rotor_effective_velocities * cosd(misalignment_angle) ** pW
+
+    return rotor_effective_velocities
 
 
 def _rotor_velocity_yaw_correction(
@@ -196,20 +213,28 @@ def rotor_effective_velocity(
         cubature_weights=cubature_weights
     )
     rotor_effective_velocities = (air_density/ref_density_cp_ct)**(1/3) * average_velocities
+    
+    # TODO: make power calculation based on misalignment angle right, as in check everything that happens
+    # # Compute the rotor effective velocity adjusting for yaw settings
+    # rotor_effective_velocities = _rotor_velocity_yaw_correction(
+    #     pP, yaw_angle, rotor_effective_velocities
+    # )
 
-    # Compute the rotor effective velocity adjusting for yaw settings
-    rotor_effective_velocities = _rotor_velocity_yaw_correction(
-        pP, yaw_angle, rotor_effective_velocities
-    )
+    # # Compute the tilt, if using floating turbines
+    # rotor_effective_velocities = _rotor_velocity_tilt_correction(
+    #     turbine_type_map,
+    #     tilt_angle,
+    #     ref_tilt_cp_ct,
+    #     pT,
+    #     tilt_interp,
+    #     correct_cp_ct_for_tilt,
+    #     rotor_effective_velocities,
+    # )
 
-    # Compute the tilt, if using floating turbines
-    rotor_effective_velocities = _rotor_velocity_tilt_correction(
-        turbine_type_map,
+    rotor_effective_velocities = _rotor_velocity_misalignment_correction(
+        pP, 
+        yaw_angle, 
         tilt_angle,
-        ref_tilt_cp_ct,
-        pT,
-        tilt_interp,
-        correct_cp_ct_for_tilt,
         rotor_effective_velocities,
     )
 
@@ -219,6 +244,8 @@ def rotor_effective_velocity(
 def power(
     ref_density_cp_ct: float,
     rotor_effective_velocities: NDArrayFloat,
+    yaw_angle: NDArrayFloat,
+    tilt_angle: NDArrayFloat,
     power_interp: NDArrayObject,
     turbine_type_map: NDArrayObject,
     ix_filter: NDArrayInt | Iterable[int] | None = None,
@@ -270,7 +297,10 @@ def power(
             * np.array(turbine_type_map == turb_type)
         )
 
-    return p * ref_density_cp_ct
+    # TODO: Check whether correct misalignment correction is applied
+    misalignment_angle = arccosd(cosd(yaw_angle) * cosd(tilt_angle))
+
+    return p * ref_density_cp_ct * cosd(misalignment_angle)
 
 
 def Ct(

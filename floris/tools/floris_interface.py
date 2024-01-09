@@ -666,6 +666,8 @@ class FlorisInterface(LoggerBase):
         turbine_powers = power(
             ref_density_cp_ct=self.floris.farm.ref_density_cp_cts,
             rotor_effective_velocities=self.turbine_effective_velocities,
+            yaw_angle=self.floris.farm.yaw_angles,
+            tilt_angle=self.floris.farm.tilt_angles,
             power_interp=self.floris.farm.turbine_power_interps,
             turbine_type_map=self.floris.farm.turbine_type_map,
         )
