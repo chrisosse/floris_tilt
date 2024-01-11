@@ -231,12 +231,12 @@ def rotor_effective_velocity(
     #     rotor_effective_velocities,
     # )
 
-    rotor_effective_velocities = _rotor_velocity_misalignment_correction(
-        pP, 
-        yaw_angle, 
-        tilt_angle,
-        rotor_effective_velocities,
-    )
+    # rotor_effective_velocities = _rotor_velocity_misalignment_correction(
+    #     pP, 
+    #     yaw_angle, 
+    #     tilt_angle,
+    #     rotor_effective_velocities,
+    # )
 
     return rotor_effective_velocities
 
@@ -300,7 +300,7 @@ def power(
     # TODO: Check whether correct misalignment correction is applied
     misalignment_angle = arccosd(cosd(yaw_angle) * cosd(tilt_angle))
 
-    return p * ref_density_cp_ct * cosd(misalignment_angle)
+    return p * ref_density_cp_ct # * cosd(misalignment_angle)
 
 
 def Ct(

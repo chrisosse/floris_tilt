@@ -209,13 +209,13 @@ class FlowField(BaseClass):
                 * speed_ups
             )
 
-        # TODO: Make V dependent on velocity
-        self.v_initial_sorted = wind_profile_crossplane
-
         self.v_initial_sorted = np.zeros(
             np.shape(self.u_initial_sorted),
             dtype=self.u_initial_sorted.dtype
         )
+
+        # TODO: Make V dependent on velocity
+        self.v_initial_sorted = wind_profile_crossplane
 
         self.w_initial_sorted = np.zeros(
             np.shape(self.u_initial_sorted),
