@@ -627,13 +627,19 @@ class FlowFieldGrid(Grid):
         # Now calculate grid coordinates in original frame (from 270 deg perspective)
         self.x_sorted_inertial_frame, self.y_sorted_inertial_frame, self.z_sorted_inertial_frame = \
             reverse_rotate_coordinates_rel_west(
-                wind_directions=self.wind_directions,
+                wind_directions=-self.wind_directions+180, # self.wind_directions+180
                 grid_x=self.x_sorted,
                 grid_y=self.y_sorted,
                 grid_z=self.z_sorted,
                 x_center_of_rotation=self.x_center_of_rotation,
                 y_center_of_rotation=self.y_center_of_rotation,
             )
+        
+        # This is done to make sure the grid is always such that 
+        # the turbines are pointed at 270 degrees
+        self.x_sorted = self.x_sorted_inertial_frame
+        self.y_sorted = self.y_sorted_inertial_frame
+        self.z_sorted = self.z_sorted_inertial_frame
         
 
 @define
