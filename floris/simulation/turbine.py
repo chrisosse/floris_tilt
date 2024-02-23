@@ -389,6 +389,11 @@ def Ct(
         )
     thrust_coefficient = np.clip(thrust_coefficient, 0.0001, 0.9999)
     effective_thrust = thrust_coefficient * cosd(yaw_angle) * cosd(tilt_angle - ref_tilt_cp_ct)
+
+    ###
+    effective_thrust = thrust_coefficient * cosd(arccosd(cosd(yaw_angle) * cosd(tilt_angle)))
+    ###
+    
     return effective_thrust
 
 
@@ -463,14 +468,24 @@ def axial_induction(
 
     return (
         0.5
-        / (cosd(yaw_angle)
-        * cosd(tilt_angle - ref_tilt_cp_ct))
+        / cosd(arccosd(cosd(yaw_angle) * cosd(tilt_angle)))
         * (
             1 - np.sqrt(
-                1 - thrust_coefficient * cosd(yaw_angle) * cosd(tilt_angle - ref_tilt_cp_ct)
+                1 - thrust_coefficient * cosd(arccosd(cosd(yaw_angle) * cosd(tilt_angle)))
             )
         )
     )
+
+    # return (
+    #     0.5
+    #     / (cosd(yaw_angle)
+    #     * cosd(tilt_angle - ref_tilt_cp_ct))
+    #     * (
+    #         1 - np.sqrt(
+    #             1 - thrust_coefficient * cosd(yaw_angle) * cosd(tilt_angle - ref_tilt_cp_ct)
+    #         )
+    #     )
+    # )
 
 
 def simple_mean(array, axis=0):
