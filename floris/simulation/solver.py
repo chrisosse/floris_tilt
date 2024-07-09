@@ -922,7 +922,14 @@ def ccm_solver(
             average_method=grid.average_method,
             cubature_weights=grid.cubature_weights
         )
-        turb_Cts = turb_Cts[:, :, :, None, None]
+        ### NEW ###
+        turb_Cts = np.where(farm.thrust_coefs_sorted == 1, turb_Cts, farm.thrust_coefs_sorted)
+        ### NEW ###
+
+        ### REMOVED ###
+        # turb_Cts = turb_Cts[:, :, :, None, None]
+        ### REMOVED ###
+
         turb_aIs = axial_induction(
             turb_avg_vels,
             farm.yaw_angles_sorted,
@@ -936,7 +943,9 @@ def ccm_solver(
             average_method=grid.average_method,
             cubature_weights=grid.cubature_weights
         )
-        turb_aIs = turb_aIs[:, :, :, None, None]
+        ### REMOVED ###
+        # turb_aIs = turb_aIs[:, :, :, None, None]
+        ### REMOVED ###
 
         u_i = turb_inflow_field[:, :, i:i+1]
         v_i = flow_field.v_sorted[:, :, i:i+1]
@@ -955,8 +964,9 @@ def ccm_solver(
             average_method=grid.average_method,
             cubature_weights=grid.cubature_weights
         )
-
-        axial_induction_i = axial_induction_i[:, :, :, None, None]
+        ### REMOVED ###
+        # axial_induction_i = axial_induction_i[:, :, :, None, None]
+        ### REMOVED ###
 
         turbulence_intensity_i = turbine_turbulence_intensity[:, :, i:i+1]
         yaw_angle_i = farm.yaw_angles_sorted[:, :, i:i+1, None, None]
@@ -971,7 +981,22 @@ def ccm_solver(
         
         misalignment_angle_i = np.ones_like(yaw_angle_i) * misalignment_angle_i
         deflection_angle_i = np.ones_like(yaw_angle_i) * deflection_angle_i
+
+        ### NEW ###
+        a_i = 1 / (2 * cosd(misalignment_angle_i[:, :, :, 0, 0])) \
+            * (1 - np.sqrt(1 - turb_Cts[:, :, i:i+1] * cosd(misalignment_angle_i[:, :, :, 0, 0])))
+        axial_induction_i = np.where(farm.thrust_coefs_sorted[:, :, i:i+1] == 1, axial_induction_i, a_i)
+        axial_induction_i = axial_induction_i[:, :, :, None, None]
+        turb_aIs = np.where(farm.thrust_coefs_sorted == 1, turb_aIs, a_i)
+        turb_aIs = turb_aIs[:, :, :, None, None]
+        turb_Cts = turb_Cts[:, :, :, None, None]
+        ### NEW ###
         
+        # print(f'  a_i:                  {a_i}')
+        # print(f'  turb_Cts:             {turb_Cts}')
+        # print(f'  turb_aIs:             {turb_aIs}')
+        # print(f'  axial_induction_i:    {axial_induction_i}')
+
         # Model calculations
 
         k_y_i, k_z_i = model_manager.deflection_model.calculate_wake_growth_rate(
@@ -1325,7 +1350,13 @@ def full_flow_ccm_solver(
             average_method=turbine_grid.average_method,
             cubature_weights=turbine_grid.cubature_weights
         )
-        turb_Cts = turb_Cts[:, :, :, None, None]
+        ### NEW ###
+        turb_Cts = np.where(farm.thrust_coefs_sorted == 1, turb_Cts, farm.thrust_coefs_sorted)
+        ### NEW ###
+        
+        ### REMOVED ###
+        # turb_Cts = turb_Cts[:, :, :, None, None]
+        ### REMOVED ###
 
         axial_induction_i = axial_induction(
             velocities=turbine_grid_flow_field.u_sorted,
@@ -1340,7 +1371,9 @@ def full_flow_ccm_solver(
             average_method=turbine_grid.average_method,
             cubature_weights=turbine_grid.cubature_weights
         )
-        axial_induction_i = axial_induction_i[:, :, :, None, None]
+        ### REMOVED ###
+        # axial_induction_i = axial_induction_i[:, :, :, None, None]
+        ### REMOVED ###
 
         turbulence_intensity_i = \
             turbine_grid_flow_field.turbulence_intensity_field_sorted_avg[:, :, i:i+1]
@@ -1357,6 +1390,14 @@ def full_flow_ccm_solver(
         
         misalignment_angle_i = np.ones_like(yaw_angle_i) * misalignment_angle_i
         deflection_angle_i = np.ones_like(yaw_angle_i) * deflection_angle_i
+
+        ### NEW ###
+        a_i = 1 / (2 * cosd(misalignment_angle_i[:, :, :, 0, 0])) \
+            * (1 - np.sqrt(1 - turb_Cts[:, :, i:i+1] * cosd(misalignment_angle_i[:, :, :, 0, 0])))
+        axial_induction_i = np.where(farm.thrust_coefs_sorted[:, :, i:i+1] == 1, axial_induction_i, a_i)
+        axial_induction_i = axial_induction_i[:, :, :, None, None]
+        turb_Cts = turb_Cts[:, :, :, None, None]
+        ### NEW ###
         
         # Model calculations
 

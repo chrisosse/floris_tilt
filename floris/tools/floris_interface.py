@@ -77,7 +77,7 @@ class FlorisInterface(LoggerBase):
                 "wind height. If this was unintended use -1 as the reference hub height to "
                 " indicate use of hub-height as reference wind height."
             )
-            self.logger.warning(err_msg, stack_info=True)
+            # self.logger.warning(err_msg, stack_info=True)
 
         # Check the turbine_grid_points is reasonable
         if self.floris.solver["type"] == "turbine_grid":
@@ -111,6 +111,9 @@ class FlorisInterface(LoggerBase):
         self,
         yaw_angles: NDArrayFloat | list[float] | None = None,
         tilt_angles: NDArrayFloat | list[float] | None = None,
+        ### NEW ###
+        thrust_coefs: NDArrayFloat | list[float] | None = None,
+        ### NEW ###
     ) -> None:
         """
         Wrapper to the :py:meth:`~.Farm.set_yaw_angles` and
@@ -120,6 +123,8 @@ class FlorisInterface(LoggerBase):
             yaw_angles (NDArrayFloat | list[float] | None, optional): Turbine yaw angles.
                 Defaults to None.
             tilt_angles (NDArrayFloat | list[float] | None, optional): Turbine tilt angles.
+                Defaults to None.
+            thrust_coefs (NDArrayFloat | list[float] | None, optional): Turbine thrust coefficients.
                 Defaults to None.
         """
 
@@ -132,6 +137,18 @@ class FlorisInterface(LoggerBase):
                 )
             )
         self.floris.farm.yaw_angles = yaw_angles
+        
+        ### NEW ###
+        if thrust_coefs is None:
+            thrust_coefs = np.ones(
+                (
+                    self.floris.flow_field.n_wind_directions,
+                    self.floris.flow_field.n_wind_speeds,
+                    self.floris.farm.n_turbines
+                )
+            )
+        self.floris.farm.thrust_coefs = thrust_coefs
+        ### NEW ###
 
         # TODO is this required?
         if tilt_angles is not None:

@@ -72,6 +72,11 @@ class Farm(BaseClass):
     tilt_angles: NDArrayFloat = field(init=False)
     tilt_angles_sorted: NDArrayFloat = field(init=False)
 
+    ### NEW ###
+    thrust_coefs = NDArrayFloat = field(init=False)
+    thrust_coefs_sorted = NDArrayFloat = field(init=False, default=[])
+    ### NEW ###
+
     hub_heights: NDArrayFloat = field(init=False)
     hub_heights_sorted: NDArrayFloat = field(init=False, default=[])
 
@@ -212,6 +217,13 @@ class Farm(BaseClass):
             sorted_indices[:, :, :, 0, 0],
             axis=2,
         )
+        ### NEW ###
+        self.thrust_coefs_sorted = np.take_along_axis(
+            self.thrust_coefs,
+            sorted_indices[:, :, :, 0, 0],
+            axis=2,
+        )
+        ### NEW ###
         self.state = State.INITIALIZED
 
     def construct_hub_heights(self):
@@ -345,6 +357,12 @@ class Farm(BaseClass):
             * self.ref_tilt_cp_cts
         )
 
+    ### NEW ###
+    def set_thrust_coefs(self, n_wind_directions: int, n_wind_speeds: int):
+        self.thrust_coefs = np.ones((n_wind_directions, n_wind_speeds, self.n_turbines))
+        self.thrust_coefs_sorted = np.ones((n_wind_directions, n_wind_speeds, self.n_turbines))
+    ### NEW ###
+
     def calculate_tilt_for_eff_velocities(self, rotor_effective_velocities):
         tilt_angles = compute_tilt_angles_for_floating_turbines(
             self.turbine_type_map_sorted,
@@ -365,6 +383,13 @@ class Farm(BaseClass):
             unsorted_indices[:,:,:,0,0],
             axis=2
         )
+        ### NEW ###
+        self.thrust_coefs = np.take_along_axis(
+            self.thrust_coefs_sorted,
+            unsorted_indices[:,:,:,0,0],
+            axis=2
+        )
+        ### NEW ###
         self.hub_heights = np.take_along_axis(
             self.hub_heights_sorted,
             unsorted_indices[:,:,:,0,0],
