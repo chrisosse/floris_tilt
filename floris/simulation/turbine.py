@@ -246,7 +246,9 @@ def power(
     rotor_effective_velocities: NDArrayFloat,
     yaw_angle: NDArrayFloat,
     tilt_angle: NDArrayFloat,
+    thrust_coef: NDArrayFloat,
     power_interp: NDArrayObject,
+    thrust_power_interp: NDArrayObject,
     turbine_type_map: NDArrayObject,
     ix_filter: NDArrayInt | Iterable[int] | None = None,
 ) -> NDArrayFloat:
@@ -258,6 +260,8 @@ def power(
         rotor_effective_velocities (NDArrayFloat[wd, ws, turbines, grid1, grid2]): The rotor
             effective velocities at a turbine.
         power_interp (NDArrayObject[wd, ws, turbines]): The power interpolation function
+            for each turbine.
+        fCt_Cp_interp (NDArrayObject[wd, ws, turbines]): The thrust power interpolation function
             for each turbine.
         turbine_type_map: (NDArrayObject[wd, ws, turbines]): The Turbine type definition for
             each turbine.
@@ -284,7 +288,7 @@ def power(
     if ix_filter is not None:
         ix_filter = _filter_convert(ix_filter, rotor_effective_velocities)
         rotor_effective_velocities = rotor_effective_velocities[:, :, ix_filter]
-        turbine_type_map = turbine_type_map[:, :, ix_filter]
+        turbine_type_map = turbine_type_map[:, :, ix_filter]     
 
     # Loop over each turbine type given to get power for all turbines
     p = np.zeros(np.shape(rotor_effective_velocities))
@@ -296,6 +300,17 @@ def power(
             power_interp[turb_type](rotor_effective_velocities)
             * np.array(turbine_type_map == turb_type)
         )
+
+    ### NEW ### 
+    p_thrust = np.zeros(np.shape(rotor_effective_velocities))
+    for turb_type in turb_types:
+        p_thrust += (
+            thrust_power_interp[turb_type](thrust_coef) * rotor_effective_velocities**3
+            * np.array(turbine_type_map == turb_type)
+        )
+
+    p = np.where(thrust_coef == 1, p, p_thrust)
+    ### NEW ###
 
     # TODO: Check whether correct misalignment correction is applied
     misalignment_angle = arccosd(cosd(yaw_angle) * cosd(tilt_angle))
@@ -684,6 +699,10 @@ class Turbine(BaseClass):
     power_interp: interp1d = field(init=False)
     tilt_interp: interp1d = field(init=False)
 
+    ### NEW ###
+    fCt_Cp_interp: interp1d = field(init=False)
+    thrust_power_interp: interp1d = field(init=False)
+    ### NEW ###
 
     # For the following parameters, use default values if not user-specified
     # self.rloc = float(input_dictionary["rloc"]) if "rloc" in input_dictionary else 0.5
@@ -712,6 +731,26 @@ class Turbine(BaseClass):
             wind_speeds,
             inner_power
         )
+        
+        ### NEW ###
+        self.fCt_Cp_interp = interp1d(
+            self.power_thrust_table.thrust,
+            self.power_thrust_table.power,
+            fill_value=(0.0, 1.0),
+            bounds_error=False,
+        )
+        inner_power = (
+            0.5 * self.rotor_area
+            * self.fCt_Cp_interp(self.power_thrust_table.thrust)
+            * self.generator_efficiency
+        )
+        self.thrust_power_interp = interp1d(
+            self.power_thrust_table.thrust,
+            inner_power,
+            fill_value=(0.0, 0.0),
+            bounds_error=False,
+        )
+        ### NEW ###
 
         """
         Given an array of wind speeds, this function returns an array of the

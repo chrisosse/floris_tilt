@@ -93,6 +93,7 @@ class Floris(BaseClass):
         )
         ### NEW ###
         self.farm.set_thrust_coefs(self.flow_field.n_wind_directions, self.flow_field.n_wind_speeds)
+        self.farm.construct_turbine_thrust_power_interps()
         ### NEW ###
 
         if self.solver["type"] == "turbine_grid":

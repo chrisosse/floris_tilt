@@ -274,6 +274,13 @@ class Farm(BaseClass):
             turb.turbine_type: turb.power_interp for turb in self.turbine_map
         }
 
+    ### NEW ###
+    def construct_turbine_thrust_power_interps(self):
+        self.turbine_thrust_power_interps = {
+            turb.turbine_type: turb.thrust_power_interp for turb in self.turbine_map
+        }
+    ### NEW ###
+
     def construct_coordinates(self):
         self.coordinates = np.array([
             Vec3([x, y, z]) for x, y, z in zip(self.layout_x, self.layout_y, self.hub_heights)
